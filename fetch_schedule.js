@@ -118,20 +118,13 @@ function parseSchedule(text) {
         return s.includes('tevfik') || s.includes('revfik') || s.includes('tevfık') || s.includes('tevflk');
     };
 
-    // Skip header rows (first few lines before any dates)
-    let firstDateIndex = rawLines.findIndex(line => line.match(/^\(?\s*([0-9il]+)\s*[|]/));
-    if (firstDateIndex === -1) firstDateIndex = 0;
-
-    const dataLines = rawLines.slice(firstDateIndex);
-
-    // Parse lines with better date tracking
+    // Step 1: Parse ALL lines and identify data rows
     const parsedLines = [];
-    let currentDate = 0;
 
-    for (let i = 0; i < dataLines.length; i++) {
-        const line = dataLines[i];
+    for (let i = 0; i < rawLines.length; i++) {
+        const line = rawLines[i];
 
-        // Check for explicit date - now handles both "(8 | Monday" and "i2 Friday"
+        // Check for explicit date - handles "(8 | Monday" and "i2 Friday"
         let explicitDate = null;
 
         // Pattern 1: Date with pipe "(8 | Monday"
@@ -152,7 +145,6 @@ function parseSchedule(text) {
             const day = parseInt(dateStr);
             if (!isNaN(day) && day >= 1 && day <= 31) {
                 explicitDate = day;
-                currentDate = day;
             }
         }
 
@@ -165,13 +157,34 @@ function parseSchedule(text) {
             parsedLines.push({
                 text: line,
                 explicitDate,
-                assignedDate: explicitDate || currentDate,
+                assignedDate: null,  // Will assign in next step
                 lineIndex: i
             });
+        }
+    }
 
-            // If no explicit date but this looks like a data row, it's likely next day
-            if (!explicitDate && currentDate > 0) {
-                currentDate++;
+    // Step 2: Assign dates to all data rows
+    // Forward pass: assign dates after explicit dates
+    let currentDate = 0;
+    for (let i = 0; i < parsedLines.length; i++) {
+        if (parsedLines[i].explicitDate) {
+            currentDate = parsedLines[i].explicitDate;
+            parsedLines[i].assignedDate = currentDate;
+        } else if (currentDate > 0) {
+            currentDate++;
+            parsedLines[i].assignedDate = currentDate;
+        }
+    }
+
+    // Backward pass: assign dates before first explicit date
+    // Work backward from the first explicit date
+    const firstExplicitIndex = parsedLines.findIndex(p => p.explicitDate);
+    if (firstExplicitIndex > 0) {
+        let backwardDate = parsedLines[firstExplicitIndex].explicitDate - 1;
+        for (let i = firstExplicitIndex - 1; i >= 0; i--) {
+            if (backwardDate >= 1) {
+                parsedLines[i].assignedDate = backwardDate;
+                backwardDate--;
             }
         }
     }
