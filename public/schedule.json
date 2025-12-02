@@ -1,12 +1,22 @@
 {
-  "lastUpdated": "2025-12-02T05:39:22.460Z",
+  "lastUpdated": "2025-12-02T05:47:45.448Z",
   "sourceFile": "PHOTO-2025-12-01-12-39-34.jpg",
   "fileLink": "https://drive.google.com/file/d/1PgMDSWNHZCWE31rN56wUkDDnUtC17-zm/view?usp=drivesdk",
   "fileId": "1PgMDSWNHZCWE31rN56wUkDDnUtC17-zm",
   "schedule": [
     {
-      "day": 8,
-      "dayName": "Monday",
+      "day": 6,
+      "dayName": "",
+      "assignments": [
+        {
+          "location": "Room 214",
+          "time": "08:00 - 12:00"
+        }
+      ]
+    },
+    {
+      "day": 7,
+      "dayName": "",
       "assignments": [
         {
           "location": "Room 201",
@@ -15,8 +25,38 @@
       ]
     },
     {
+      "day": 8,
+      "dayName": "",
+      "assignments": [
+        {
+          "location": "Room 201",
+          "time": "08:00 - 15:00"
+        }
+      ]
+    },
+    {
+      "day": 11,
+      "dayName": "",
+      "assignments": [
+        {
+          "location": "Room 201",
+          "time": "08:00 - 15:00"
+        }
+      ]
+    },
+    {
+      "day": 12,
+      "dayName": "",
+      "assignments": [
+        {
+          "location": "Room 214",
+          "time": "08:00 - 12:00"
+        }
+      ]
+    },
+    {
       "day": 14,
-      "dayName": "Sunday",
+      "dayName": "",
       "assignments": [
         {
           "location": "Room 201",
@@ -26,7 +66,7 @@
     },
     {
       "day": 15,
-      "dayName": "Monday",
+      "dayName": "",
       "assignments": [
         {
           "location": "Room 214",
@@ -36,7 +76,7 @@
     },
     {
       "day": 16,
-      "dayName": "Tuesday",
+      "dayName": "",
       "assignments": [
         {
           "location": "Room 214",
@@ -46,17 +86,27 @@
     },
     {
       "day": 20,
-      "dayName": "Saturday",
+      "dayName": "",
       "assignments": [
         {
           "location": "Room 201",
           "time": "08:00 - 15:00"
+        }
+      ]
+    },
+    {
+      "day": 21,
+      "dayName": "",
+      "assignments": [
+        {
+          "location": "Room 214",
+          "time": "12:00 - 19:00"
         }
       ]
     },
     {
       "day": 22,
-      "dayName": "Monday",
+      "dayName": "",
       "assignments": [
         {
           "location": "Room 201",
@@ -65,8 +115,18 @@
       ]
     },
     {
+      "day": 23,
+      "dayName": "",
+      "assignments": [
+        {
+          "location": "Room 214",
+          "time": "08:00 - 12:00"
+        }
+      ]
+    },
+    {
       "day": 28,
-      "dayName": "Sunday",
+      "dayName": "",
       "assignments": [
         {
           "location": "Room 201",

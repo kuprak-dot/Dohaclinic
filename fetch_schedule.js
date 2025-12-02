@@ -107,10 +107,7 @@ function parseSchedule(text) {
     console.log(text.substring(0, 500) + "...");
     console.log("------------------------------");
 
-    const lines = text.split('\n');
-    const schedule = [];
-    const currentYear = new Date().getFullYear();
-    const currentMonth = new Date().getMonth() + 1; // 1-12 (Next month usually)
+    const rawLines = text.split('\n').filter(l => l.trim().length > 0);
 
     // Helper to clean text
     const clean = (str) => str ? str.trim().toLowerCase() : '';
@@ -118,68 +115,118 @@ function parseSchedule(text) {
     // Helper to check if text contains Dr. Tevfik
     const isTevfik = (str) => {
         const s = clean(str);
-        return s.includes('tevfik') || s.includes('revfik') || s.includes('tevfık');
+        return s.includes('tevfik') || s.includes('revfik') || s.includes('tevfık') || s.includes('tevflk');
     };
 
-    lines.forEach(line => {
-        // Look for lines starting with a number (date)
-        // Regex: starts with optional (, digit(s), optional |, word
-        const match = line.match(/^\(?\s*(\d+)\s*\|?/);
-        if (!match) return;
-
-        const day = parseInt(match[1]);
-        if (isNaN(day) || day < 1 || day > 31) return;
-
-        // Split by pipe | or multiple spaces
-        // OCR might miss pipes, so we might need to be flexible. 
-        // For now, let's rely on pipes if present, or try to split by large gaps.
-        // The preview showed pipes: "(14| Sunday | Drirevfik..."
-
-        let parts = line.split('|');
-        if (parts.length < 3) {
-            // Fallback: split by multiple spaces?
-            // parts = line.split(/\s{2,}/);
+    // Step 1: Analyze lines
+    const parsedLines = rawLines.map(line => {
+        const dateMatch = line.match(/^\(?\s*([0-9il]+)\s*[|]/);
+        let explicitDate = null;
+        if (dateMatch) {
+            let dateStr = dateMatch[1].replace(/i/g, '1').replace(/l/g, '1');
+            const day = parseInt(dateStr);
+            if (!isNaN(day) && day >= 1 && day <= 31) {
+                explicitDate = day;
+            }
         }
 
-        // Normalize parts
-        parts = parts.map(p => p.trim());
+        // Heuristic for a schedule row: contains '|' OR contains 'Dr' or 'Or' (common OCR error for Dr)
+        const isRow = line.includes('|') ||
+            line.toLowerCase().includes('dr') ||
+            line.toLowerCase().includes('or.');
 
-        // Expected Columns (approximate):
-        // 0: Date (e.g. "14")
-        // 1: Day (e.g. "Sunday")
-        // 2: Room 201 (08:00 - 15:00)
-        // 3: Room 214 (08:00 - 12:00)
-        // 4: Room 214 (12:00 - 19:00)
-        // 5: On Call
-        // 6: Abu Sidra
+        return {
+            text: line,
+            explicitDate,
+            isRow,
+            finalDate: explicitDate
+        };
+    });
 
-        // We need to find where Tevfik is.
-        // Note: parts[0] is date, parts[1] is day. So assignments start at parts[2].
+    // Step 2: Forward Pass (Propagate dates forward)
+    let lastDate = 0;
+    for (let i = 0; i < parsedLines.length; i++) {
+        if (parsedLines[i].explicitDate) {
+            lastDate = parsedLines[i].explicitDate;
+        } else if (lastDate > 0 && parsedLines[i].isRow) {
+            // Only increment if the previous line was also a row (to avoid jumping over garbage)
+            // Actually, if we hit garbage, we should probably stop propagating?
+            // But garbage might be just noise.
+            // Let's assume if it's a row, it's the next day.
+            // Check if we are not exceeding the next explicit date?
+            // That requires global knowledge.
+            // Let's just set it tentatively, backward pass will correct/verify.
+            parsedLines[i].finalDate = lastDate + 1;
+            lastDate++;
+        }
+    }
 
+    // Step 3: Backward Pass (Propagate dates backward from explicit dates)
+    // This helps recover dates before the first explicit date or in gaps
+    let nextDate = 32;
+    for (let i = parsedLines.length - 1; i >= 0; i--) {
+        if (parsedLines[i].explicitDate) {
+            nextDate = parsedLines[i].explicitDate;
+        } else if (nextDate <= 31 && parsedLines[i].isRow) {
+            // If we already have a finalDate from forward pass, check consistency
+            // If forward says X and backward says Y, which one to trust?
+            // Usually explicit dates are anchors.
+            // If we are filling a gap between A and B.
+            // Forward fills A+1, A+2...
+            // Backward fills B-1, B-2...
+            // If they meet, great.
+            // If this line has no date yet, use backward.
+            if (!parsedLines[i].finalDate) {
+                parsedLines[i].finalDate = nextDate - 1;
+                nextDate--;
+            }
+        }
+    }
+
+    // Step 4: Extract Shifts
+    const schedule = [];
+
+    parsedLines.forEach(item => {
+        if (!item.finalDate || !item.isRow || item.finalDate > 31 || item.finalDate < 1) return;
+
+        // Determine columns
+        let parts = item.text.split('|').map(p => p.trim());
+        let shift = 0;
+
+        // If explicit date, usually: Date | Day | Col1...
+        if (item.explicitDate) {
+            shift = 2;
+        } else {
+            // If inferred, usually: Col1 | Col2...
+            // BUT, sometimes it's "DayName | Col1..." or just "Col1..."
+            // Let's look for Day Name in parts[0]?
+            const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
+                'pazartesi', 'sali', 'carsamba', 'persembe', 'cuma', 'cumartesi', 'pazar'];
+            if (parts[0] && days.some(d => parts[0].toLowerCase().includes(d))) {
+                shift = 1;
+            }
+        }
+
+        const getPart = (index) => parts[index + shift];
         const assignments = [];
 
-        if (parts[2] && isTevfik(parts[2])) {
-            assignments.push({ location: "Room 201", time: "08:00 - 15:00" });
-        }
-        if (parts[3] && isTevfik(parts[3])) {
-            assignments.push({ location: "Room 214", time: "08:00 - 12:00" });
-        }
-        if (parts[4] && isTevfik(parts[4])) {
-            assignments.push({ location: "Room 214", time: "12:00 - 19:00" });
-        }
-        if (parts[5] && isTevfik(parts[5])) {
-            assignments.push({ location: "On Call", time: "24h" });
-        }
-        if (parts[6] && isTevfik(parts[6])) {
-            assignments.push({ location: "Abu Sidra", time: "13:00 - 21:00" });
-        }
+        if (isTevfik(getPart(0))) assignments.push({ location: "Room 201", time: "08:00 - 15:00" });
+        if (isTevfik(getPart(1))) assignments.push({ location: "Room 214", time: "08:00 - 12:00" });
+        if (isTevfik(getPart(2))) assignments.push({ location: "Room 214", time: "12:00 - 19:00" });
+        if (isTevfik(getPart(3))) assignments.push({ location: "On Call", time: "24h" });
+        if (isTevfik(getPart(4))) assignments.push({ location: "Abu Sidra", time: "13:00 - 21:00" });
 
         if (assignments.length > 0) {
-            schedule.push({
-                day: day,
-                dayName: parts[1] || '',
-                assignments: assignments
-            });
+            const existingIndex = schedule.findIndex(s => s.day === item.finalDate);
+            if (existingIndex !== -1) {
+                schedule[existingIndex].assignments.push(...assignments);
+            } else {
+                schedule.push({
+                    day: item.finalDate,
+                    dayName: "",
+                    assignments: assignments
+                });
+            }
         }
     });
 
@@ -207,6 +254,7 @@ async function main() {
     console.log("Extracting text with OCR...");
     try {
         const text = await extractTextFromImage(localPath);
+        fs.writeFileSync('debug_ocr.txt', text); // Save raw text for debugging
         const schedule = parseSchedule(text);
 
         const result = {
