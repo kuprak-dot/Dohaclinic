@@ -1,0 +1,331 @@
+import React, { useState, useEffect } from 'react';
+import { Calendar, FileText, Bell, Clock, MapPin, Sun, Edit3, ChevronDown, ChevronUp } from 'lucide-react';
+import { spanishWords } from './spanishWords';
+
+function App() {
+  const [activeTab, setActiveTab] = useState('schedule');
+  const [scheduleData, setScheduleData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [weather, setWeather] = useState(null);
+  const [showAllUpcoming, setShowAllUpcoming] = useState(false);
+  const [notes, setNotes] = useState(() => {
+    const saved = localStorage.getItem('dailyNotes');
+    return saved ? JSON.parse(saved) : {};
+  });
+
+  useEffect(() => {
+    // Fetch schedule data
+    fetch('/schedule.json')
+      .then(res => res.json())
+      .then(data => {
+        setScheduleData(data);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error("Error loading schedule:", err);
+        setLoading(false);
+      });
+
+    // Fetch weather for Doha
+    fetch('https://wttr.in/Doha?format=j1')
+      .then(res => res.json())
+      .then(data => {
+        setWeather({
+          temp: data.current_condition[0].temp_C,
+          condition: data.current_condition[0].weatherDesc[0].value
+        });
+      })
+      .catch(err => console.error("Weather fetch failed:", err));
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('dailyNotes', JSON.stringify(notes));
+  }, [notes]);
+
+  const handleNoteChange = (day, value) => {
+    setNotes(prev => ({
+      ...prev,
+      [day]: value
+    }));
+  };
+
+  // Get today's assignments
+  const getTodaySchedule = () => {
+    if (!scheduleData?.schedule) return [];
+    const today = new Date();
+    const dayOfMonth = today.getDate();
+    const todayData = scheduleData.schedule.find(d => d.day === dayOfMonth);
+    return todayData?.assignments || [];
+  };
+
+  // Get upcoming assignments (next 7 days, EXCLUDING today)
+  const getUpcomingSchedule = () => {
+    if (!scheduleData?.schedule) return [];
+    const today = new Date();
+    const dayOfMonth = today.getDate();
+
+    return scheduleData.schedule
+      .filter(d => d.day > dayOfMonth) // Exclude today
+      .slice(0, 10); // Get next 10 days available
+  };
+
+  const todayAssignments = getTodaySchedule();
+  const allUpcomingDays = getUpcomingSchedule();
+  const upcomingDays = showAllUpcoming ? allUpcomingDays : allUpcomingDays.slice(0, 4);
+  const currentDay = new Date().getDate();
+
+  // Spanish Word of the Day Logic
+  const dayOfYear = Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 0)) / 1000 / 60 / 60 / 24);
+  const dailyWord = spanishWords[dayOfYear % spanishWords.length];
+
+  const getLocationColor = (location) => {
+    if (location.includes('Room 201')) return 'bg-yellow-100 text-yellow-900 border-yellow-300';
+    if (location.includes('Room 214')) return 'bg-orange-100 text-orange-900 border-orange-300';
+    if (location.includes('On Call')) return 'bg-red-100 text-red-900 border-red-300';
+    if (location.includes('Abu Sidra')) return 'bg-blue-100 text-blue-900 border-blue-300';
+    return 'bg-slate-100 text-slate-800 border-slate-200';
+  };
+
+  const getNotePlaceholder = (assignments) => {
+    if (!assignments || assignments.length === 0) return 'Not ekle...';
+
+    // Check if all assignments are PM (after 12:00)
+    const allPm = assignments.every(a => {
+      const hour = parseInt(a.time.split(':')[0]);
+      return hour >= 12;
+    });
+
+    if (allPm) return 'Sabah planları...';
+
+    // Check if all assignments are AM (before 12:00)
+    const allAm = assignments.every(a => {
+      const hour = parseInt(a.time.split(':')[0]);
+      return hour < 12;
+    });
+
+    if (allAm) return 'Öğleden sonra planları...';
+
+    return 'Not ekle...';
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 pb-24 font-sans text-base">
+      {/* Header */}
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-10 px-3 py-2 shadow-sm">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-9 h-9 bg-primary rounded-lg flex items-center justify-center text-white font-bold text-lg">
+              DC
+            </div>
+            <h1 className="font-bold text-slate-800 text-xl">Doha Clinic</h1>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {weather && (
+              <div className="flex items-center gap-1.5 text-slate-600">
+                <Sun size={20} className="text-amber-500" />
+                <span className="font-semibold text-lg">{weather.temp}°C</span>
+              </div>
+            )}
+            <button className="p-2 text-slate-500 hover:bg-slate-100 rounded-full">
+              <Bell size={24} />
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="p-2 max-w-md mx-auto space-y-2">
+        {activeTab === 'schedule' && (
+          <div className="space-y-2">
+            {/* Today's Schedule */}
+            <div className="bg-white p-3 rounded-xl shadow-sm border border-slate-100">
+              <h2 className="text-xl font-bold text-slate-800 mb-0.5">Merhaba, Dr. Tevfik</h2>
+              <p className="text-slate-500 text-base mb-2">Bugünkü programınız</p>
+
+              {loading ? (
+                <div className="p-3 bg-slate-50 rounded-lg animate-pulse h-20"></div>
+              ) : todayAssignments.length > 0 ? (
+                <div className="space-y-2">
+                  {todayAssignments.map((assignment, idx) => (
+                    <div key={idx} className={`p-3 rounded-lg border flex items-center gap-3 ${getLocationColor(assignment.location)}`}>
+                      <MapPin size={20} />
+                      <div className="flex-1">
+                        <span className="font-bold text-xl">{assignment.location}</span>
+                        <div className="flex items-center gap-1 opacity-90 mt-0.5 text-base font-medium">
+                          <Clock size={16} />
+                          <span>{assignment.time}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-3 bg-blue-50 text-blue-800 rounded-lg border border-blue-100 flex items-center gap-3">
+                  <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
+                  <span className="font-semibold text-lg">Bugün görev yok ✨</span>
+                </div>
+              )}
+            </div>
+
+            {/* Upcoming Schedule */}
+            <div>
+              <h3 className="font-bold text-slate-700 mb-2 text-lg px-1">Yaklaşan Görevler</h3>
+              <div className="space-y-2">
+                {loading ? (
+                  <>
+                    <div className="bg-white p-3 rounded-xl shadow-sm border border-slate-100 animate-pulse h-24"></div>
+                    <div className="bg-white p-3 rounded-xl shadow-sm border border-slate-100 animate-pulse h-24"></div>
+                  </>
+                ) : upcomingDays.length > 0 ? (
+                  <>
+                    {upcomingDays.map((day) => {
+                      const placeholder = getNotePlaceholder(day.assignments);
+
+                      return (
+                        <div
+                          key={day.day}
+                          className="p-3 rounded-xl shadow-sm border bg-white border-slate-100"
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className="p-2 rounded-lg text-center min-w-[3.8rem] bg-slate-100">
+                              <span className="block text-xs uppercase font-bold mb-0.5 text-slate-500">
+                                {day.dayName}
+                              </span>
+                              <span className="block text-2xl font-bold text-slate-800">
+                                {day.day}
+                              </span>
+                            </div>
+                            <div className="flex-1 space-y-2">
+                              {day.assignments && day.assignments.length > 0 ? (
+                                day.assignments.map((assignment, idx) => (
+                                  <div key={idx} className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                      <MapPin size={18} className="text-slate-400" />
+                                      <span className="font-semibold text-lg text-slate-800">
+                                        {assignment.location}
+                                      </span>
+                                    </div>
+                                    <span className="text-sm font-medium text-slate-500">
+                                      {assignment.time}
+                                    </span>
+                                  </div>
+                                ))
+                              ) : (
+                                <span className="text-sm text-slate-400 font-medium">
+                                  Görev yok
+                                </span>
+                              )}
+
+                              {/* Daily Note Input - No Label */}
+                              <div className="mt-1 pt-2 border-t border-slate-100">
+                                <div className="flex items-center gap-2">
+                                  <Edit3 size={16} className="text-slate-400" />
+                                  <input
+                                    type="text"
+                                    value={notes[day.day] || ''}
+                                    onChange={(e) => handleNoteChange(day.day, e.target.value)}
+                                    placeholder={placeholder}
+                                    className="w-full text-base bg-transparent border-none focus:ring-0 p-0 text-slate-700 placeholder-slate-400"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {/* Show More / Less Button */}
+                    {allUpcomingDays.length > 4 && (
+                      <button
+                        onClick={() => setShowAllUpcoming(!showAllUpcoming)}
+                        className="w-full py-2 flex items-center justify-center gap-2 text-slate-500 hover:text-primary hover:bg-slate-50 rounded-lg transition-colors font-medium text-sm"
+                      >
+                        {showAllUpcoming ? (
+                          <>
+                            <ChevronUp size={18} />
+                            Daha Az Göster
+                          </>
+                        ) : (
+                          <>
+                            <ChevronDown size={18} />
+                            Daha Fazla Göster ({allUpcomingDays.length - 4})
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </>
+                ) : (
+                  <div className="text-center py-8 text-slate-400 bg-white rounded-xl border border-slate-100">
+                    <Calendar size={32} className="mx-auto mb-2 opacity-50" />
+                    <p className="text-base">Yaklaşan görev yok</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Spanish Word of the Day */}
+            <div className="bg-gradient-to-r from-amber-50 to-orange-50 p-4 rounded-xl border border-orange-100 mt-3">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-2xl">🇪🇸</span>
+                <h3 className="font-bold text-orange-900 text-lg">Günün İspanyolca Kelimesi</h3>
+              </div>
+              <div className="mb-2">
+                <span className="text-3xl font-bold text-slate-800 block mb-1">{dailyWord.word}</span>
+                <span className="text-base text-slate-600 italic font-medium">{dailyWord.meaning}</span>
+              </div>
+              <div className="bg-white bg-opacity-60 p-3 rounded-lg border border-orange-100">
+                <p className="text-base text-slate-800 font-medium mb-1">"{dailyWord.sentence}"</p>
+                <p className="text-sm text-slate-500 italic">"{dailyWord.sentence_en}"</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'files' && (
+          <div className="flex flex-col items-center justify-center h-[60vh] text-slate-400">
+            <FileText size={56} className="mb-4 opacity-50" />
+            {scheduleData?.sourceFile ? (
+              <div className="text-center">
+                <p className="mb-2 text-lg">Mevcut dosya:</p>
+                <p className="font-bold text-slate-700 text-xl">{scheduleData.sourceFile}</p>
+                <p className="text-sm text-slate-500 mt-2">
+                  Son güncelleme: {new Date(scheduleData.lastUpdated).toLocaleDateString('tr-TR')}
+                </p>
+              </div>
+            ) : (
+              <>
+                <p className="text-lg">Henüz dosya yüklenmedi</p>
+                <button className="mt-6 px-6 py-3 bg-primary text-white rounded-xl text-base font-bold shadow-sm hover:bg-sky-600 transition-colors">
+                  Dosya Yükle
+                </button>
+              </>
+            )}
+          </div>
+        )}
+      </main>
+
+      {/* Bottom Navigation */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-6 py-3 flex justify-around items-center z-20 safe-area-bottom shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+        <button
+          onClick={() => setActiveTab('schedule')}
+          className={`flex flex-col items-center gap-1 p-2 rounded-lg transition-colors ${activeTab === 'schedule' ? 'text-primary' : 'text-slate-400 hover:text-slate-600'}`}
+        >
+          <Calendar size={28} />
+          <span className="text-xs font-bold">Program</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('files')}
+          className={`flex flex-col items-center gap-1 p-2 rounded-lg transition-colors ${activeTab === 'files' ? 'text-primary' : 'text-slate-400 hover:text-slate-600'}`}
+        >
+          <FileText size={28} />
+          <span className="text-xs font-bold">Dosyalar</span>
+        </button>
+      </nav>
+    </div>
+  );
+}
+
+export default App;

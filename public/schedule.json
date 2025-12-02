@@ -1,0 +1,78 @@
+{
+  "lastUpdated": "2025-12-02T05:39:22.460Z",
+  "sourceFile": "PHOTO-2025-12-01-12-39-34.jpg",
+  "fileLink": "https://drive.google.com/file/d/1PgMDSWNHZCWE31rN56wUkDDnUtC17-zm/view?usp=drivesdk",
+  "fileId": "1PgMDSWNHZCWE31rN56wUkDDnUtC17-zm",
+  "schedule": [
+    {
+      "day": 8,
+      "dayName": "Monday",
+      "assignments": [
+        {
+          "location": "Room 201",
+          "time": "08:00 - 15:00"
+        }
+      ]
+    },
+    {
+      "day": 14,
+      "dayName": "Sunday",
+      "assignments": [
+        {
+          "location": "Room 201",
+          "time": "08:00 - 15:00"
+        }
+      ]
+    },
+    {
+      "day": 15,
+      "dayName": "Monday",
+      "assignments": [
+        {
+          "location": "Room 214",
+          "time": "12:00 - 19:00"
+        }
+      ]
+    },
+    {
+      "day": 16,
+      "dayName": "Tuesday",
+      "assignments": [
+        {
+          "location": "Room 214",
+          "time": "12:00 - 19:00"
+        }
+      ]
+    },
+    {
+      "day": 20,
+      "dayName": "Saturday",
+      "assignments": [
+        {
+          "location": "Room 201",
+          "time": "08:00 - 15:00"
+        }
+      ]
+    },
+    {
+      "day": 22,
+      "dayName": "Monday",
+      "assignments": [
+        {
+          "location": "Room 201",
+          "time": "08:00 - 15:00"
+        }
+      ]
+    },
+    {
+      "day": 28,
+      "dayName": "Sunday",
+      "assignments": [
+        {
+          "location": "Room 201",
+          "time": "08:00 - 15:00"
+        }
+      ]
+    }
+  ]
+}
