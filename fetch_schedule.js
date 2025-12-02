@@ -118,111 +118,124 @@ function parseSchedule(text) {
         return s.includes('tevfik') || s.includes('revfik') || s.includes('tevfık') || s.includes('tevflk');
     };
 
-    // Step 1: Analyze lines
-    const parsedLines = rawLines.map(line => {
-        const dateMatch = line.match(/^\(?\s*([0-9il]+)\s*[|]/);
+    // Skip header rows (first few lines before any dates)
+    let firstDateIndex = rawLines.findIndex(line => line.match(/^\(?\s*([0-9il]+)\s*[|]/));
+    if (firstDateIndex === -1) firstDateIndex = 0;
+
+    const dataLines = rawLines.slice(firstDateIndex);
+
+    // Parse lines with better date tracking
+    const parsedLines = [];
+    let currentDate = 0;
+
+    for (let i = 0; i < dataLines.length; i++) {
+        const line = dataLines[i];
+
+        // Check for explicit date - now handles both "(8 | Monday" and "i2 Friday"
         let explicitDate = null;
+
+        // Pattern 1: Date with pipe "(8 | Monday"
+        let dateMatch = line.match(/^\(?\s*([0-9il]+)\s*[|]/);
+        if (!dateMatch) {
+            // Pattern 2: Date followed by day name "i2 Friday", "12 Saturday", etc
+            const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
+                'pazartesi', 'sali', 'carsamba', 'persembe', 'cuma', 'cumartesi', 'pazar'];
+            for (const day of days) {
+                const pattern = new RegExp(`^\\(?\\s*([0-9il]+)\\s+${day}`, 'i');
+                dateMatch = line.match(pattern);
+                if (dateMatch) break;
+            }
+        }
+
         if (dateMatch) {
             let dateStr = dateMatch[1].replace(/i/g, '1').replace(/l/g, '1');
             const day = parseInt(dateStr);
             if (!isNaN(day) && day >= 1 && day <= 31) {
                 explicitDate = day;
+                currentDate = day;
             }
         }
 
-        // Heuristic for a schedule row: contains '|' OR contains 'Dr' or 'Or' (common OCR error for Dr)
-        const isRow = line.includes('|') ||
-            line.toLowerCase().includes('dr') ||
-            line.toLowerCase().includes('or.');
+        // Check if this is a data row (has pipes and might have doctor names)
+        const hasPipes = line.includes('|');
+        const hasDrNames = /dr[.\s]/i.test(line) || /or[.\s]/i.test(line);
+        const isDataRow = hasPipes && (hasDrNames || explicitDate);
 
-        return {
-            text: line,
-            explicitDate,
-            isRow,
-            finalDate: explicitDate
-        };
-    });
+        if (isDataRow) {
+            parsedLines.push({
+                text: line,
+                explicitDate,
+                assignedDate: explicitDate || currentDate,
+                lineIndex: i
+            });
 
-    // Step 2: Forward Pass (Propagate dates forward)
-    let lastDate = 0;
-    for (let i = 0; i < parsedLines.length; i++) {
-        if (parsedLines[i].explicitDate) {
-            lastDate = parsedLines[i].explicitDate;
-        } else if (lastDate > 0 && parsedLines[i].isRow) {
-            // Only increment if the previous line was also a row (to avoid jumping over garbage)
-            // Actually, if we hit garbage, we should probably stop propagating?
-            // But garbage might be just noise.
-            // Let's assume if it's a row, it's the next day.
-            // Check if we are not exceeding the next explicit date?
-            // That requires global knowledge.
-            // Let's just set it tentatively, backward pass will correct/verify.
-            parsedLines[i].finalDate = lastDate + 1;
-            lastDate++;
-        }
-    }
-
-    // Step 3: Backward Pass (Propagate dates backward from explicit dates)
-    // This helps recover dates before the first explicit date or in gaps
-    let nextDate = 32;
-    for (let i = parsedLines.length - 1; i >= 0; i--) {
-        if (parsedLines[i].explicitDate) {
-            nextDate = parsedLines[i].explicitDate;
-        } else if (nextDate <= 31 && parsedLines[i].isRow) {
-            // If we already have a finalDate from forward pass, check consistency
-            // If forward says X and backward says Y, which one to trust?
-            // Usually explicit dates are anchors.
-            // If we are filling a gap between A and B.
-            // Forward fills A+1, A+2...
-            // Backward fills B-1, B-2...
-            // If they meet, great.
-            // If this line has no date yet, use backward.
-            if (!parsedLines[i].finalDate) {
-                parsedLines[i].finalDate = nextDate - 1;
-                nextDate--;
+            // If no explicit date but this looks like a data row, it's likely next day
+            if (!explicitDate && currentDate > 0) {
+                currentDate++;
             }
         }
     }
 
-    // Step 4: Extract Shifts
+    // Extract shifts from parsed lines
     const schedule = [];
 
     parsedLines.forEach(item => {
-        if (!item.finalDate || !item.isRow || item.finalDate > 31 || item.finalDate < 1) return;
+        if (!item.assignedDate || item.assignedDate < 1 || item.assignedDate > 31) return;
 
-        // Determine columns
-        let parts = item.text.split('|').map(p => p.trim());
-        let shift = 0;
+        const parts = item.text.split('|').map(p => p.trim());
+        let columnOffset = 0;
 
-        // If explicit date, usually: Date | Day | Col1...
+        // Determine column offset based on line structure
         if (item.explicitDate) {
-            shift = 2;
+            // Line starts with date, usually: (Date | Day | Col0 | Col1 | Col2 | Col3 | Col4)
+            columnOffset = 2;
         } else {
-            // If inferred, usually: Col1 | Col2...
-            // BUT, sometimes it's "DayName | Col1..." or just "Col1..."
-            // Let's look for Day Name in parts[0]?
+            // No date marker - could be continuation or just data
+            // Check if first part is a day name
             const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
                 'pazartesi', 'sali', 'carsamba', 'persembe', 'cuma', 'cumartesi', 'pazar'];
             if (parts[0] && days.some(d => parts[0].toLowerCase().includes(d))) {
-                shift = 1;
+                columnOffset = 1;
+            } else {
+                columnOffset = 0;
             }
         }
 
-        const getPart = (index) => parts[index + shift];
         const assignments = [];
 
-        if (isTevfik(getPart(0))) assignments.push({ location: "Room 201", time: "08:00 - 15:00" });
-        if (isTevfik(getPart(1))) assignments.push({ location: "Room 214", time: "08:00 - 12:00" });
-        if (isTevfik(getPart(2))) assignments.push({ location: "Room 214", time: "12:00 - 19:00" });
-        if (isTevfik(getPart(3))) assignments.push({ location: "On Call", time: "24h" });
-        if (isTevfik(getPart(4))) assignments.push({ location: "Abu Sidra", time: "13:00 - 21:00" });
+        // Check each column for Dr. Tevfik
+        // Column mapping: 0=Room 201, 1=Room 214 (8am-12pm), 2=Room 214 (12pm-7pm), 3=On Call, 4=Abu Sidra
+        for (let col = 0; col < 5; col++) {
+            const partIndex = columnOffset + col;
+            if (partIndex < parts.length && isTevfik(parts[partIndex])) {
+                switch (col) {
+                    case 0:
+                        assignments.push({ location: "Room 201", time: "08:00 - 15:00" });
+                        break;
+                    case 1:
+                        assignments.push({ location: "Room 214", time: "08:00 - 12:00" });
+                        break;
+                    case 2:
+                        assignments.push({ location: "Room 214", time: "12:00 - 19:00" });
+                        break;
+                    case 3:
+                        assignments.push({ location: "On Call", time: "24h" });
+                        break;
+                    case 4:
+                        assignments.push({ location: "Abu Sidra", time: "13:00 - 21:00" });
+                        break;
+                }
+            }
+        }
 
         if (assignments.length > 0) {
-            const existingIndex = schedule.findIndex(s => s.day === item.finalDate);
+            const existingIndex = schedule.findIndex(s => s.day === item.assignedDate);
             if (existingIndex !== -1) {
+                // Merge assignments for the same day
                 schedule[existingIndex].assignments.push(...assignments);
             } else {
                 schedule.push({
-                    day: item.finalDate,
+                    day: item.assignedDate,
                     dayName: "",
                     assignments: assignments
                 });
@@ -230,7 +243,7 @@ function parseSchedule(text) {
         }
     });
 
-    return schedule;
+    return schedule.sort((a, b) => a.day - b.day);
 }
 
 // Main function
