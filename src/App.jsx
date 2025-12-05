@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, FileText, Bell, Clock, MapPin, Sun, Edit3, ChevronDown, ChevronUp } from 'lucide-react';
+import { Calendar, FileText, Bell, Clock, MapPin, Sun, Edit3, ChevronDown, ChevronUp, Plus, X } from 'lucide-react';
 import { spanishWords } from './spanishWords';
 import { parseScheduleFile, generateICS } from './utils/parser';
 import { saveAs } from 'file-saver';
@@ -13,6 +13,18 @@ function App() {
   const [notes, setNotes] = useState(() => {
     const saved = localStorage.getItem('dailyNotes');
     return saved ? JSON.parse(saved) : {};
+  });
+
+  // Manual duty entry state
+  const [manualDuties, setManualDuties] = useState(() => {
+    const saved = localStorage.getItem('manualDuties');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [showAddDutyModal, setShowAddDutyModal] = useState(false);
+  const [newDuty, setNewDuty] = useState({
+    day: '',
+    location: 'Room 201',
+    time: '08:00 - 15:00'
   });
 
   // File Processing State
@@ -49,6 +61,11 @@ function App() {
     localStorage.setItem('dailyNotes', JSON.stringify(notes));
   }, [notes]);
 
+  // Save manual duties to localStorage
+  useEffect(() => {
+    localStorage.setItem('manualDuties', JSON.stringify(manualDuties));
+  }, [manualDuties]);
+
   const handleNoteChange = (day, value) => {
     setNotes(prev => ({
       ...prev,
@@ -56,24 +73,116 @@ function App() {
     }));
   };
 
-  // Get today's assignments
-  const getTodaySchedule = () => {
-    if (!scheduleData?.schedule) return [];
-    const today = new Date();
-    const dayOfMonth = today.getDate();
-    const todayData = scheduleData.schedule.find(d => d.day === dayOfMonth);
-    return todayData?.assignments || [];
+  // Get time options based on location
+  const getTimeOptions = (location) => {
+    switch (location) {
+      case 'Room 201':
+        return ['08:00 - 15:00'];
+      case 'Room 214':
+        return ['08:00 - 12:00', '12:00 - 19:00'];
+      case 'On Call':
+        return ['24h'];
+      default:
+        return ['08:00 - 15:00'];
+    }
   };
 
-  // Get upcoming assignments (next 7 days, EXCLUDING today)
-  const getUpcomingSchedule = () => {
-    if (!scheduleData?.schedule) return [];
+  // Handle location change - auto-set time
+  const handleLocationChange = (location) => {
+    const times = getTimeOptions(location);
+    setNewDuty(prev => ({
+      ...prev,
+      location,
+      time: times[0]
+    }));
+  };
+
+  // Add manual duty
+  const handleAddDuty = () => {
+    if (!newDuty.day) return;
+
+    const duty = {
+      day: parseInt(newDuty.day),
+      location: newDuty.location,
+      time: newDuty.time,
+      isManual: true
+    };
+
+    setManualDuties(prev => [...prev, duty]);
+    setNewDuty({ day: '', location: 'Room 201', time: '08:00 - 15:00' });
+    setShowAddDutyModal(false);
+  };
+
+  // Remove manual duty
+  const handleRemoveDuty = (day, location) => {
+    setManualDuties(prev => prev.filter(d => !(d.day === day && d.location === location)));
+  };
+
+  // Get today's assignments (including manual duties)
+  const getTodaySchedule = () => {
     const today = new Date();
     const dayOfMonth = today.getDate();
 
-    return scheduleData.schedule
-      .filter(d => d.day > dayOfMonth) // Exclude today
-      .slice(0, 10); // Get next 10 days available
+    // Get from schedule.json
+    const jsonData = scheduleData?.schedule?.find(d => d.day === dayOfMonth);
+    const jsonAssignments = jsonData?.assignments || [];
+
+    // Get manual duties for today
+    const manualToday = manualDuties
+      .filter(d => d.day === dayOfMonth)
+      .map(d => ({ location: d.location, time: d.time, isManual: true }));
+
+    return [...jsonAssignments, ...manualToday];
+  };
+
+  // Get upcoming assignments (next 7 days, EXCLUDING today) - merged with manual duties
+  const getUpcomingSchedule = () => {
+    const today = new Date();
+    const dayOfMonth = today.getDate();
+
+    // Create a map of all days with assignments
+    const dayMap = new Map();
+
+    // Add schedule.json data
+    if (scheduleData?.schedule) {
+      scheduleData.schedule
+        .filter(d => d.day > dayOfMonth)
+        .forEach(d => {
+          dayMap.set(d.day, {
+            day: d.day,
+            dayName: d.dayName || '',
+            assignments: d.assignments.map(a => ({ ...a, isManual: false }))
+          });
+        });
+    }
+
+    // Merge manual duties
+    manualDuties
+      .filter(d => d.day > dayOfMonth)
+      .forEach(duty => {
+        if (dayMap.has(duty.day)) {
+          dayMap.get(duty.day).assignments.push({
+            location: duty.location,
+            time: duty.time,
+            isManual: true
+          });
+        } else {
+          dayMap.set(duty.day, {
+            day: duty.day,
+            dayName: '',
+            assignments: [{
+              location: duty.location,
+              time: duty.time,
+              isManual: true
+            }]
+          });
+        }
+      });
+
+    // Convert to array and sort by day
+    return Array.from(dayMap.values())
+      .sort((a, b) => a.day - b.day)
+      .slice(0, 10);
   };
 
   const todayAssignments = getTodaySchedule();
@@ -204,7 +313,15 @@ function App() {
 
             {/* Upcoming Schedule */}
             <div>
-              <h3 className="font-bold text-slate-700 mb-2 text-lg px-1">Yaklaşan Görevler</h3>
+              <div className="flex items-center justify-between mb-2 px-1">
+                <h3 className="font-bold text-slate-700 text-lg">Yaklaşan Görevler</h3>
+                <button
+                  onClick={() => setShowAddDutyModal(true)}
+                  className="w-8 h-8 bg-primary text-white rounded-full flex items-center justify-center hover:bg-sky-600 transition-colors shadow-sm"
+                >
+                  <Plus size={20} />
+                </button>
+              </div>
               <div className="space-y-2">
                 {loading ? (
                   <>
@@ -239,10 +356,23 @@ function App() {
                                       <span className="font-semibold text-lg text-slate-800">
                                         {assignment.location}
                                       </span>
+                                      {assignment.isManual && (
+                                        <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-medium">Manuel</span>
+                                      )}
                                     </div>
-                                    <span className="text-sm font-medium text-slate-500">
-                                      {assignment.time}
-                                    </span>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-sm font-medium text-slate-500">
+                                        {assignment.time}
+                                      </span>
+                                      {assignment.isManual && (
+                                        <button
+                                          onClick={() => handleRemoveDuty(day.day, assignment.location)}
+                                          className="w-5 h-5 bg-red-100 text-red-500 rounded-full flex items-center justify-center hover:bg-red-200 transition-colors"
+                                        >
+                                          <X size={14} />
+                                        </button>
+                                      )}
+                                    </div>
                                   </div>
                                 ))
                               ) : (
@@ -403,6 +533,79 @@ function App() {
           </div>
         )}
       </main>
+
+      {/* Add Duty Modal */}
+      {showAddDutyModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl">
+            <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="font-bold text-lg text-slate-800">Manuel Görev Ekle</h3>
+              <button
+                onClick={() => setShowAddDutyModal(false)}
+                className="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-200"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-4 space-y-4">
+              {/* Day Picker */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Tarih (Aralık 2025)</label>
+                <select
+                  value={newDuty.day}
+                  onChange={(e) => setNewDuty(prev => ({ ...prev, day: e.target.value }))}
+                  className="w-full p-3 border border-slate-200 rounded-xl text-lg font-medium focus:ring-2 focus:ring-primary focus:border-primary"
+                >
+                  <option value="">Gün seçin...</option>
+                  {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
+                    <option key={day} value={day}>{day} Aralık</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Location Picker */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Konum</label>
+                <select
+                  value={newDuty.location}
+                  onChange={(e) => handleLocationChange(e.target.value)}
+                  className="w-full p-3 border border-slate-200 rounded-xl text-lg font-medium focus:ring-2 focus:ring-primary focus:border-primary"
+                >
+                  <option value="Room 201">Room 201</option>
+                  <option value="Room 214">Room 214</option>
+                  <option value="On Call">On Call</option>
+                </select>
+              </div>
+
+              {/* Time Picker */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Saat</label>
+                <select
+                  value={newDuty.time}
+                  onChange={(e) => setNewDuty(prev => ({ ...prev, time: e.target.value }))}
+                  className="w-full p-3 border border-slate-200 rounded-xl text-lg font-medium focus:ring-2 focus:ring-primary focus:border-primary"
+                >
+                  {getTimeOptions(newDuty.location).map(time => (
+                    <option key={time} value={time}>{time}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-slate-100">
+              <button
+                onClick={handleAddDuty}
+                disabled={!newDuty.day}
+                className="w-full py-3 bg-primary text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-sky-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Plus size={20} />
+                Görev Ekle
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Bottom Navigation */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-6 py-3 flex justify-around items-center z-20 safe-area-bottom shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
