@@ -77,11 +77,13 @@ function App() {
   const getTimeOptions = (location) => {
     switch (location) {
       case 'Room 201':
-        return ['08:00 - 15:00'];
+        return ['08:00 - 15:00', '15:00 - 22:00'];
       case 'Room 214':
-        return ['08:00 - 12:00', '12:00 - 19:00', '15:00 - 22:00'];
+        return ['12:00 - 19:00'];
       case 'Abu Sidra':
         return ['13:00 - 21:00'];
+      case 'Cuma Nöbet':
+        return ['24h'];
       case 'On Call':
         return ['24h'];
       default:
@@ -199,6 +201,7 @@ function App() {
   const getLocationColor = (location) => {
     if (location.includes('Room 201')) return 'bg-yellow-100 text-yellow-900 border-yellow-300';
     if (location.includes('Room 214')) return 'bg-orange-100 text-orange-900 border-orange-300';
+    if (location.includes('Cuma Nöbet')) return 'bg-purple-100 text-purple-900 border-purple-300';
     if (location.includes('On Call')) return 'bg-red-100 text-red-900 border-red-300';
     if (location.includes('Abu Sidra')) return 'bg-blue-100 text-blue-900 border-blue-300';
     return 'bg-slate-100 text-slate-800 border-slate-200';
@@ -577,6 +580,7 @@ function App() {
                   <option value="Room 201">Room 201</option>
                   <option value="Room 214">Room 214</option>
                   <option value="Abu Sidra">Abu Sidra</option>
+                  <option value="Cuma Nöbet">Cuma Nöbet</option>
                   <option value="On Call">On Call</option>
                 </select>
               </div>
