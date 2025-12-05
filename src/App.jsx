@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, FileText, Bell, Clock, MapPin, Sun, Edit3, ChevronDown, ChevronUp, Plus, X } from 'lucide-react';
+import { Calendar, FileText, Bell, Clock, MapPin, Sun, Edit3, ChevronDown, ChevronUp, Plus, X, Download } from 'lucide-react';
 import { spanishWords } from './spanishWords';
 import { parseScheduleFile, generateICS } from './utils/parser';
 import { saveAs } from 'file-saver';
@@ -284,6 +284,57 @@ function App() {
     saveAs(blob, 'doha_clinic_schedule.ics');
   };
 
+  // Export full month schedule (JSON + manual - hidden) to ICS
+  const exportFullScheduleToICS = () => {
+    // Create a map of all days with assignments
+    const dayMap = new Map();
+
+    // Add schedule.json data (filter hidden ones)
+    if (scheduleData?.schedule) {
+      scheduleData.schedule.forEach(d => {
+        const filteredAssignments = d.assignments
+          .filter(a => !isDutyHidden(d.day, a.location));
+
+        if (filteredAssignments.length > 0) {
+          dayMap.set(d.day, {
+            day: d.day,
+            assignments: filteredAssignments
+          });
+        }
+      });
+    }
+
+    // Merge manual duties
+    manualDuties.forEach(duty => {
+      if (dayMap.has(duty.day)) {
+        dayMap.get(duty.day).assignments.push({
+          location: duty.location,
+          time: duty.time
+        });
+      } else {
+        dayMap.set(duty.day, {
+          day: duty.day,
+          assignments: [{
+            location: duty.location,
+            time: duty.time
+          }]
+        });
+      }
+    });
+
+    // Convert to array and sort
+    const fullSchedule = Array.from(dayMap.values()).sort((a, b) => a.day - b.day);
+
+    if (fullSchedule.length === 0) {
+      alert('Takvime eklenecek görev bulunamadı!');
+      return;
+    }
+
+    const icsContent = generateICS(fullSchedule);
+    const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+    saveAs(blob, 'aralik_2025_program.ics');
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 pb-24 font-sans text-base">
       {/* Header */}
@@ -366,12 +417,22 @@ function App() {
             <div>
               <div className="flex items-center justify-between mb-2 px-1">
                 <h3 className="font-bold text-slate-700 text-lg">Yaklaşan Görevler</h3>
-                <button
-                  onClick={() => setShowAddDutyModal(true)}
-                  className="w-8 h-8 bg-primary text-white rounded-full flex items-center justify-center hover:bg-sky-600 transition-colors shadow-sm"
-                >
-                  <Plus size={20} />
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={exportFullScheduleToICS}
+                    className="w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center hover:bg-green-600 transition-colors shadow-sm"
+                    title="iOS Takvime Aktar"
+                  >
+                    <Download size={18} />
+                  </button>
+                  <button
+                    onClick={() => setShowAddDutyModal(true)}
+                    className="w-8 h-8 bg-primary text-white rounded-full flex items-center justify-center hover:bg-sky-600 transition-colors shadow-sm"
+                    title="Manuel Görev Ekle"
+                  >
+                    <Plus size={20} />
+                  </button>
+                </div>
               </div>
               <div className="space-y-2">
                 {loading ? (
