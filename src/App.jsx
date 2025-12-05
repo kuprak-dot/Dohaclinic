@@ -79,7 +79,9 @@ function App() {
       case 'Room 201':
         return ['08:00 - 15:00'];
       case 'Room 214':
-        return ['08:00 - 12:00', '12:00 - 19:00'];
+        return ['08:00 - 12:00', '12:00 - 19:00', '15:00 - 22:00'];
+      case 'Abu Sidra':
+        return ['13:00 - 21:00'];
       case 'On Call':
         return ['24h'];
       default:
@@ -574,6 +576,7 @@ function App() {
                 >
                   <option value="Room 201">Room 201</option>
                   <option value="Room 214">Room 214</option>
+                  <option value="Abu Sidra">Abu Sidra</option>
                   <option value="On Call">On Call</option>
                 </select>
               </div>
