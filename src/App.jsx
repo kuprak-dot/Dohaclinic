@@ -449,9 +449,8 @@ function App() {
             rel="noopener noreferrer"
             className="flex items-center gap-2 text-white"
           >
-            <Newspaper size={16} className="text-red-400 flex-shrink-0" />
-            <span className="text-xs text-red-400 font-bold mr-1">DÜNYA</span>
-            <span className="text-sm font-medium truncate flex-1">
+            <Newspaper size={14} className="text-red-400 flex-shrink-0" />
+            <span className="text-xs font-medium truncate flex-1">
               {news[newsIndex]?.title}
             </span>
             <ExternalLink size={14} className="text-slate-400 flex-shrink-0" />
@@ -481,9 +480,8 @@ function App() {
             rel="noopener noreferrer"
             className="flex items-center gap-2 text-white"
           >
-            <TrendingUp size={16} className="text-emerald-300 flex-shrink-0" />
-            <span className="text-xs text-emerald-300 font-bold mr-1">BLOOMBERG</span>
-            <span className="text-sm font-medium truncate flex-1">
+            <TrendingUp size={14} className="text-emerald-300 flex-shrink-0" />
+            <span className="text-xs font-medium truncate flex-1">
               {businessNews[businessIndex]?.title}
             </span>
             <ExternalLink size={14} className="text-emerald-400 flex-shrink-0" />
