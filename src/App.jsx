@@ -199,12 +199,12 @@ function App() {
   const dailyWord = spanishWords[dayOfYear % spanishWords.length];
 
   const getLocationColor = (location) => {
-    if (location.includes('Room 201')) return 'bg-yellow-100 text-yellow-900 border-yellow-300';
-    if (location.includes('Room 214')) return 'bg-orange-100 text-orange-900 border-orange-300';
-    if (location.includes('Cuma Nöbet')) return 'bg-purple-100 text-purple-900 border-purple-300';
-    if (location.includes('On Call')) return 'bg-red-100 text-red-900 border-red-300';
-    if (location.includes('Abu Sidra')) return 'bg-blue-100 text-blue-900 border-blue-300';
-    return 'bg-slate-100 text-slate-800 border-slate-200';
+    if (location.includes('Room 201')) return { bg: '#fef9c3', text: '#713f12', border: '#fde047' };
+    if (location.includes('Room 214')) return { bg: '#ffedd5', text: '#9a3412', border: '#fdba74' };
+    if (location.includes('Cuma Nöbet')) return { bg: '#f3e8ff', text: '#581c87', border: '#d8b4fe' };
+    if (location.includes('On Call')) return { bg: '#fee2e2', text: '#991b1b', border: '#fca5a5' };
+    if (location.includes('Abu Sidra')) return { bg: '#dbeafe', text: '#1e40af', border: '#93c5fd' };
+    return { bg: '#f1f5f9', text: '#1e293b', border: '#cbd5e1' };
   };
 
   const getNotePlaceholder = (assignments) => {
@@ -295,18 +295,25 @@ function App() {
                 <div className="p-3 bg-slate-50 rounded-lg animate-pulse h-20"></div>
               ) : todayAssignments.length > 0 ? (
                 <div className="space-y-2">
-                  {todayAssignments.map((assignment, idx) => (
-                    <div key={idx} className={`p-3 rounded-lg border flex items-center gap-3 ${getLocationColor(assignment.location)}`}>
-                      <MapPin size={20} />
-                      <div className="flex-1">
-                        <span className="font-bold text-xl">{assignment.location}</span>
-                        <div className="flex items-center gap-1 opacity-90 mt-0.5 text-base font-medium">
-                          <Clock size={16} />
-                          <span>{assignment.time}</span>
+                  {todayAssignments.map((assignment, idx) => {
+                    const colors = getLocationColor(assignment.location);
+                    return (
+                      <div
+                        key={idx}
+                        className="p-3 rounded-lg border flex items-center gap-3"
+                        style={{ backgroundColor: colors.bg, color: colors.text, borderColor: colors.border }}
+                      >
+                        <MapPin size={20} />
+                        <div className="flex-1">
+                          <span className="font-bold text-xl">{assignment.location}</span>
+                          <div className="flex items-center gap-1 opacity-90 mt-0.5 text-base font-medium">
+                            <Clock size={16} />
+                            <span>{assignment.time}</span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="p-3 bg-blue-50 text-blue-800 rounded-lg border border-blue-100 flex items-center gap-3">
@@ -563,9 +570,15 @@ function App() {
                   className="w-full p-3 border border-slate-200 rounded-xl text-lg font-medium focus:ring-2 focus:ring-primary focus:border-primary"
                 >
                   <option value="">Gün seçin...</option>
-                  {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
-                    <option key={day} value={day}>{day} Aralık</option>
-                  ))}
+                  {Array.from({ length: 31 }, (_, i) => {
+                    const day = i + 1;
+                    const date = new Date(2025, 11, day); // December 2025
+                    const dayNames = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
+                    const dayName = dayNames[date.getDay()];
+                    return (
+                      <option key={day} value={day}>{day} Aralık ({dayName})</option>
+                    );
+                  })}
                 </select>
               </div>
 
