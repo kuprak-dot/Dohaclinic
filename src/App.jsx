@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, FileText, Bell, Clock, MapPin, Sun, Edit3, ChevronDown, ChevronUp, Plus, X, Download } from 'lucide-react';
+import { Calendar, FileText, Bell, Clock, MapPin, Sun, Edit3, ChevronDown, ChevronUp, Plus, X, Download, Newspaper, ExternalLink, TrendingUp } from 'lucide-react';
 import { spanishWords } from './spanishWords';
 import { parseScheduleFile, generateICS } from './utils/parser';
 import { saveAs } from 'file-saver';
@@ -37,6 +37,13 @@ function App() {
   const [processStatus, setProcessStatus] = useState('');
   const [parsedEvents, setParsedEvents] = useState(null);
 
+  // News Widget State
+  const [news, setNews] = useState([]);
+  const [newsIndex, setNewsIndex] = useState(0);
+  const [businessNews, setBusinessNews] = useState([]);
+  const [businessIndex, setBusinessIndex] = useState(0);
+  const [touchStart, setTouchStart] = useState(null);
+
   useEffect(() => {
     // Fetch schedule data
     fetch('/schedule.json')
@@ -60,7 +67,75 @@ function App() {
         });
       })
       .catch(err => console.error("Weather fetch failed:", err));
+
+    // Fetch BBC World News
+    const bbcWorldUrl = 'https://feeds.bbci.co.uk/news/world/rss.xml';
+    fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(bbcWorldUrl)}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.items) {
+          setNews(data.items.slice(0, 5));
+        }
+      })
+      .catch(err => console.error("World news fetch failed:", err));
+
+    // Fetch Bloomberg Markets News
+    const bloombergUrl = 'https://feeds.bloomberg.com/markets/news.rss';
+    fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(bloombergUrl)}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.items) {
+          setBusinessNews(data.items.slice(0, 5));
+        }
+      })
+      .catch(err => console.error("Bloomberg news fetch failed:", err));
   }, []);
+
+  // Auto-rotate news every 5 seconds
+  useEffect(() => {
+    if (news.length === 0) return;
+    const interval = setInterval(() => {
+      setNewsIndex(prev => (prev + 1) % news.length);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [news]);
+
+  // Auto-rotate business news every 6 seconds (offset from world news)
+  useEffect(() => {
+    if (businessNews.length === 0) return;
+    const interval = setInterval(() => {
+      setBusinessIndex(prev => (prev + 1) % businessNews.length);
+    }, 6000);
+    return () => clearInterval(interval);
+  }, [businessNews]);
+
+  // Swipe handlers
+  const handleTouchStart = (e) => {
+    setTouchStart(e.touches[0].clientX);
+  };
+
+  const handleTouchEnd = (e, type) => {
+    if (!touchStart) return;
+    const touchEnd = e.changedTouches[0].clientX;
+    const diff = touchStart - touchEnd;
+
+    if (Math.abs(diff) > 50) { // Min 50px swipe
+      if (type === 'world') {
+        if (diff > 0) {
+          setNewsIndex(prev => (prev + 1) % news.length);
+        } else {
+          setNewsIndex(prev => (prev - 1 + news.length) % news.length);
+        }
+      } else {
+        if (diff > 0) {
+          setBusinessIndex(prev => (prev + 1) % businessNews.length);
+        } else {
+          setBusinessIndex(prev => (prev - 1 + businessNews.length) % businessNews.length);
+        }
+      }
+    }
+    setTouchStart(null);
+  };
 
   useEffect(() => {
     localStorage.setItem('dailyNotes', JSON.stringify(notes));
@@ -360,6 +435,70 @@ function App() {
           </div>
         </div>
       </header>
+
+      {/* World News Widget */}
+      {news.length > 0 && (
+        <div
+          className="bg-gradient-to-r from-slate-800 to-slate-900 px-3 py-2"
+          onTouchStart={handleTouchStart}
+          onTouchEnd={(e) => handleTouchEnd(e, 'world')}
+        >
+          <a
+            href={news[newsIndex]?.link}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 text-white"
+          >
+            <Newspaper size={16} className="text-red-400 flex-shrink-0" />
+            <span className="text-xs text-red-400 font-bold mr-1">DÜNYA</span>
+            <span className="text-sm font-medium truncate flex-1">
+              {news[newsIndex]?.title}
+            </span>
+            <ExternalLink size={14} className="text-slate-400 flex-shrink-0" />
+          </a>
+          <div className="flex justify-center gap-1 mt-1">
+            {news.map((_, idx) => (
+              <button
+                key={idx}
+                onClick={() => setNewsIndex(idx)}
+                className={`w-1.5 h-1.5 rounded-full transition-colors ${idx === newsIndex ? 'bg-red-400' : 'bg-slate-600'}`}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Business News Widget */}
+      {businessNews.length > 0 && (
+        <div
+          className="bg-gradient-to-r from-emerald-800 to-emerald-900 px-3 py-2"
+          onTouchStart={handleTouchStart}
+          onTouchEnd={(e) => handleTouchEnd(e, 'business')}
+        >
+          <a
+            href={businessNews[businessIndex]?.link}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 text-white"
+          >
+            <TrendingUp size={16} className="text-emerald-300 flex-shrink-0" />
+            <span className="text-xs text-emerald-300 font-bold mr-1">BLOOMBERG</span>
+            <span className="text-sm font-medium truncate flex-1">
+              {businessNews[businessIndex]?.title}
+            </span>
+            <ExternalLink size={14} className="text-emerald-400 flex-shrink-0" />
+          </a>
+          <div className="flex justify-center gap-1 mt-1">
+            {businessNews.map((_, idx) => (
+              <button
+                key={idx}
+                onClick={() => setBusinessIndex(idx)}
+                className={`w-1.5 h-1.5 rounded-full transition-colors ${idx === businessIndex ? 'bg-emerald-300' : 'bg-emerald-700'}`}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Main Content */}
       <main className="p-2 max-w-md mx-auto space-y-2">
