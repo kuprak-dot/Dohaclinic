@@ -344,6 +344,10 @@ function App() {
                   <>
                     {upcomingDays.map((day) => {
                       const placeholder = getNotePlaceholder(day.assignments);
+                      // Calculate day name for December 2025
+                      const date = new Date(2025, 11, day.day);
+                      const dayNames = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
+                      const dayName = dayNames[date.getDay()];
 
                       return (
                         <div
@@ -353,7 +357,7 @@ function App() {
                           <div className="flex items-start gap-3">
                             <div className="p-2 rounded-lg text-center min-w-[3.8rem] bg-slate-100">
                               <span className="block text-xs uppercase font-bold mb-0.5 text-slate-500">
-                                {day.dayName}
+                                {dayName}
                               </span>
                               <span className="block text-2xl font-bold text-slate-800">
                                 {day.day}
@@ -361,32 +365,39 @@ function App() {
                             </div>
                             <div className="flex-1 space-y-2">
                               {day.assignments && day.assignments.length > 0 ? (
-                                day.assignments.map((assignment, idx) => (
-                                  <div key={idx} className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                      <MapPin size={18} className="text-slate-400" />
-                                      <span className="font-semibold text-lg text-slate-800">
-                                        {assignment.location}
-                                      </span>
-                                      {assignment.isManual && (
-                                        <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-medium">Manuel</span>
-                                      )}
+                                day.assignments.map((assignment, idx) => {
+                                  const colors = getLocationColor(assignment.location);
+                                  return (
+                                    <div
+                                      key={idx}
+                                      className="flex items-center justify-between p-2 rounded-lg border"
+                                      style={{ backgroundColor: colors.bg, borderColor: colors.border }}
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <MapPin size={18} style={{ color: colors.text }} />
+                                        <span className="font-semibold text-lg" style={{ color: colors.text }}>
+                                          {assignment.location}
+                                        </span>
+                                        {assignment.isManual && (
+                                          <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-medium">Manuel</span>
+                                        )}
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-sm font-medium" style={{ color: colors.text }}>
+                                          {assignment.time}
+                                        </span>
+                                        {assignment.isManual && (
+                                          <button
+                                            onClick={() => handleRemoveDuty(day.day, assignment.location)}
+                                            className="w-5 h-5 bg-red-100 text-red-500 rounded-full flex items-center justify-center hover:bg-red-200 transition-colors"
+                                          >
+                                            <X size={14} />
+                                          </button>
+                                        )}
+                                      </div>
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-sm font-medium text-slate-500">
-                                        {assignment.time}
-                                      </span>
-                                      {assignment.isManual && (
-                                        <button
-                                          onClick={() => handleRemoveDuty(day.day, assignment.location)}
-                                          className="w-5 h-5 bg-red-100 text-red-500 rounded-full flex items-center justify-center hover:bg-red-200 transition-colors"
-                                        >
-                                          <X size={14} />
-                                        </button>
-                                      )}
-                                    </div>
-                                  </div>
-                                ))
+                                  );
+                                })
                               ) : (
                                 <span className="text-sm text-slate-400 font-medium">
                                   Görev yok
