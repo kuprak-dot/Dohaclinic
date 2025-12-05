@@ -20,6 +20,11 @@ function App() {
     const saved = localStorage.getItem('manualDuties');
     return saved ? JSON.parse(saved) : [];
   });
+  // Hidden duties (for incorrectly parsed JSON entries)
+  const [hiddenDuties, setHiddenDuties] = useState(() => {
+    const saved = localStorage.getItem('hiddenDuties');
+    return saved ? JSON.parse(saved) : [];
+  });
   const [showAddDutyModal, setShowAddDutyModal] = useState(false);
   const [newDuty, setNewDuty] = useState({
     day: '',
@@ -66,11 +71,26 @@ function App() {
     localStorage.setItem('manualDuties', JSON.stringify(manualDuties));
   }, [manualDuties]);
 
+  // Save hidden duties to localStorage
+  useEffect(() => {
+    localStorage.setItem('hiddenDuties', JSON.stringify(hiddenDuties));
+  }, [hiddenDuties]);
+
   const handleNoteChange = (day, value) => {
     setNotes(prev => ({
       ...prev,
       [day]: value
     }));
+  };
+
+  // Hide a JSON schedule entry
+  const hideJsonDuty = (day, location) => {
+    setHiddenDuties(prev => [...prev, { day, location }]);
+  };
+
+  // Check if a duty is hidden
+  const isDutyHidden = (day, location) => {
+    return hiddenDuties.some(h => h.day === day && h.location === location);
   };
 
   // Get time options based on location
@@ -127,9 +147,11 @@ function App() {
     const today = new Date();
     const dayOfMonth = today.getDate();
 
-    // Get from schedule.json
+    // Get from schedule.json and filter out hidden ones
     const jsonData = scheduleData?.schedule?.find(d => d.day === dayOfMonth);
-    const jsonAssignments = jsonData?.assignments || [];
+    const jsonAssignments = (jsonData?.assignments || [])
+      .filter(a => !isDutyHidden(dayOfMonth, a.location))
+      .map(a => ({ ...a, isManual: false }));
 
     // Get manual duties for today
     const manualToday = manualDuties
@@ -147,16 +169,22 @@ function App() {
     // Create a map of all days with assignments
     const dayMap = new Map();
 
-    // Add schedule.json data
+    // Add schedule.json data (filter hidden ones)
     if (scheduleData?.schedule) {
       scheduleData.schedule
         .filter(d => d.day > dayOfMonth)
         .forEach(d => {
-          dayMap.set(d.day, {
-            day: d.day,
-            dayName: d.dayName || '',
-            assignments: d.assignments.map(a => ({ ...a, isManual: false }))
-          });
+          const filteredAssignments = d.assignments
+            .filter(a => !isDutyHidden(d.day, a.location))
+            .map(a => ({ ...a, isManual: false }));
+
+          if (filteredAssignments.length > 0) {
+            dayMap.set(d.day, {
+              day: d.day,
+              dayName: d.dayName || '',
+              assignments: filteredAssignments
+            });
+          }
         });
     }
 
@@ -311,6 +339,17 @@ function App() {
                             <span>{assignment.time}</span>
                           </div>
                         </div>
+                        <button
+                          onClick={() => {
+                            const today = new Date().getDate();
+                            assignment.isManual
+                              ? handleRemoveDuty(today, assignment.location)
+                              : hideJsonDuty(today, assignment.location);
+                          }}
+                          className="w-6 h-6 bg-red-100 text-red-500 rounded-full flex items-center justify-center hover:bg-red-200 transition-colors"
+                        >
+                          <X size={16} />
+                        </button>
                       </div>
                     );
                   })}
@@ -386,14 +425,15 @@ function App() {
                                         <span className="text-sm font-medium" style={{ color: colors.text }}>
                                           {assignment.time}
                                         </span>
-                                        {assignment.isManual && (
-                                          <button
-                                            onClick={() => handleRemoveDuty(day.day, assignment.location)}
-                                            className="w-5 h-5 bg-red-100 text-red-500 rounded-full flex items-center justify-center hover:bg-red-200 transition-colors"
-                                          >
-                                            <X size={14} />
-                                          </button>
-                                        )}
+                                        <button
+                                          onClick={() => assignment.isManual
+                                            ? handleRemoveDuty(day.day, assignment.location)
+                                            : hideJsonDuty(day.day, assignment.location)
+                                          }
+                                          className="w-5 h-5 bg-red-100 text-red-500 rounded-full flex items-center justify-center hover:bg-red-200 transition-colors"
+                                        >
+                                          <X size={14} />
+                                        </button>
                                       </div>
                                     </div>
                                   );
