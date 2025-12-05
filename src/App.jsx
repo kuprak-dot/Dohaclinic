@@ -447,10 +447,10 @@ function App() {
             href={news[newsIndex]?.link}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-2 text-white"
+            className="flex items-start gap-2 text-white"
           >
-            <Newspaper size={14} className="text-red-400 flex-shrink-0" />
-            <span className="text-xs font-medium truncate flex-1">
+            <Newspaper size={14} className="text-red-400 flex-shrink-0 mt-0.5" />
+            <span className="text-xs font-medium flex-1 line-clamp-2">
               {news[newsIndex]?.title}
             </span>
             <ExternalLink size={14} className="text-slate-400 flex-shrink-0" />
@@ -478,10 +478,10 @@ function App() {
             href={businessNews[businessIndex]?.link}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-2 text-white"
+            className="flex items-start gap-2 text-white"
           >
-            <TrendingUp size={14} className="text-emerald-300 flex-shrink-0" />
-            <span className="text-xs font-medium truncate flex-1">
+            <TrendingUp size={14} className="text-emerald-300 flex-shrink-0 mt-0.5" />
+            <span className="text-xs font-medium flex-1 line-clamp-2">
               {businessNews[businessIndex]?.title}
             </span>
             <ExternalLink size={14} className="text-emerald-400 flex-shrink-0" />
