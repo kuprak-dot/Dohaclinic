@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, FileText, Bell, Clock, MapPin, Sun, Edit3, ChevronDown, ChevronUp } from 'lucide-react';
 import { spanishWords } from './spanishWords';
+import { parseScheduleFile, generateICS } from './utils/parser';
+import { saveAs } from 'file-saver';
 
 function App() {
   const [activeTab, setActiveTab] = useState('schedule');
@@ -12,6 +14,11 @@ function App() {
     const saved = localStorage.getItem('dailyNotes');
     return saved ? JSON.parse(saved) : {};
   });
+
+  // File Processing State
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processStatus, setProcessStatus] = useState('');
+  const [parsedEvents, setParsedEvents] = useState(null);
 
   useEffect(() => {
     // Fetch schedule data
@@ -106,6 +113,33 @@ function App() {
     if (allAm) return 'Öğleden sonra planları...';
 
     return 'Not ekle...';
+  };
+
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setIsProcessing(true);
+    setProcessStatus('Analiz ediliyor (Bu işlem birkaç saniye sürebilir)...');
+    setParsedEvents(null);
+
+    try {
+      const schedule = await parseScheduleFile(file, "Tevfik");
+      setParsedEvents(schedule);
+      setProcessStatus(`Başarılı! ${schedule.length} gün bulundu.`);
+    } catch (error) {
+      console.error(error);
+      setProcessStatus('Hata: ' + error.message);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleAddToCalendar = () => {
+    if (!parsedEvents) return;
+    const icsContent = generateICS(parsedEvents);
+    const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+    saveAs(blob, 'doha_clinic_schedule.ics');
   };
 
   return (
@@ -226,7 +260,7 @@ function App() {
                                     value={notes[day.day] || ''}
                                     onChange={(e) => handleNoteChange(day.day, e.target.value)}
                                     placeholder={placeholder}
-                                    className="w-full text-base bg-transparent border-none focus:ring-0 p-0 text-slate-700 placeholder-slate-400"
+                                    className="w-full text-base bg-transparent border-none focus:ring-0 p-0 italic text-[#6b1225] placeholder:text-[#b95b75]"
                                   />
                                 </div>
                               </div>
@@ -284,23 +318,87 @@ function App() {
         )}
 
         {activeTab === 'files' && (
-          <div className="flex flex-col items-center justify-center h-[60vh] text-slate-400">
-            <FileText size={56} className="mb-4 opacity-50" />
-            {scheduleData?.sourceFile ? (
-              <div className="text-center">
-                <p className="mb-2 text-lg">Mevcut dosya:</p>
-                <p className="font-bold text-slate-700 text-xl">{scheduleData.sourceFile}</p>
-                <p className="text-sm text-slate-500 mt-2">
-                  Son güncelleme: {new Date(scheduleData.lastUpdated).toLocaleDateString('tr-TR')}
-                </p>
+          <div className="flex flex-col items-center justify-start min-h-[60vh] text-slate-400 p-4 space-y-6">
+            <div className="w-full max-w-sm bg-white p-6 rounded-2xl shadow-sm border border-slate-100 text-center">
+              <FileText size={48} className="mx-auto mb-4 text-slate-300" />
+              <h3 className="text-lg font-bold text-slate-800 mb-2">Program Yükle</h3>
+              <p className="text-sm text-slate-500 mb-6">
+                Dr. Tevfik'in programını bulmak için resim (JPG), PDF veya Excel dosyası yükleyin.
+              </p>
+
+              <label className="block w-full">
+                <span className="sr-only">Dosya seç</span>
+                <input
+                  type="file"
+                  onChange={handleFileUpload}
+                  accept=".pdf,.jpg,.jpeg,.png,.xlsx,.xls"
+                  className="block w-full text-sm text-slate-500
+                        file:mr-4 file:py-2.5 file:px-4
+                        file:rounded-full file:border-0
+                        file:text-sm file:font-bold
+                        file:bg-primary file:text-white
+                        hover:file:bg-sky-600
+                        cursor-pointer"
+                />
+              </label>
+            </div>
+
+            {/* Status & Results */}
+            {(isProcessing || processStatus) && (
+              <div className="w-full max-w-sm bg-white p-4 rounded-xl shadow-sm border border-slate-100 text-center">
+                {isProcessing ? (
+                  <div className="flex flex-col items-center gap-3 py-4">
+                    <div className="w-8 h-8 border-4 border-slate-200 border-t-primary rounded-full animate-spin"></div>
+                    <p className="text-slate-600 font-medium text-sm">{processStatus}</p>
+                  </div>
+                ) : (
+                  <div className="py-2">
+                    <p className={`font-bold mb-3 ${processStatus.includes('Hata') ? 'text-red-500' : 'text-green-600'}`}>
+                      {processStatus}
+                    </p>
+
+                    {parsedEvents && parsedEvents.length > 0 && (
+                      <button
+                        onClick={handleAddToCalendar}
+                        className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-800 transition-colors"
+                      >
+                        <Calendar size={20} />
+                        iPhone Takvimine Ekle
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
-            ) : (
-              <>
-                <p className="text-lg">Henüz dosya yüklenmedi</p>
-                <button className="mt-6 px-6 py-3 bg-primary text-white rounded-xl text-base font-bold shadow-sm hover:bg-sky-600 transition-colors">
-                  Dosya Yükle
-                </button>
-              </>
+            )}
+
+            {/* Preview of Events */}
+            {parsedEvents && parsedEvents.length > 0 && (
+              <div className="w-full max-w-sm space-y-2">
+                <h4 className="font-bold text-slate-700 px-1">Bulunan Vardiyalar ({parsedEvents.length})</h4>
+                {parsedEvents.map((day, idx) => (
+                  <div key={idx} className="bg-white p-3 rounded-xl border border-slate-100 flex items-start gap-3">
+                    <div className="bg-slate-100 px-2 py-1 rounded text-center min-w-[3rem]">
+                      <span className="block text-xl font-bold text-slate-700">{day.day}</span>
+                    </div>
+                    <div className="flex-1 space-y-1">
+                      {day.assignments.map((a, i) => (
+                        <div key={i} className="text-sm">
+                          <span className="font-bold text-slate-800">{a.location}</span>
+                          <span className="text-slate-400 mx-1">•</span>
+                          <span className="text-slate-500">{a.time}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {scheduleData?.sourceFile && !parsedEvents && (
+              <div className="text-center mt-8 pt-8 border-t border-slate-100 w-full">
+                <p className="mb-1 text-xs uppercase font-bold text-slate-400">Şu anki aktif liste</p>
+                <p className="font-medium text-slate-600 text-sm">{scheduleData.sourceFile}</p>
+              </div>
             )}
           </div>
         )}
