@@ -152,49 +152,125 @@ function App() {
   }, [hiddenDuties]);
 
   // Training Program State
-  const [trainingItems, setTrainingItems] = useState(() => {
-    const saved = localStorage.getItem('trainingItems');
-    return saved ? JSON.parse(saved) : [];
+  const [trainingGroups, setTrainingGroups] = useState(() => {
+    const savedGroups = localStorage.getItem('trainingGroups');
+    if (savedGroups) return JSON.parse(savedGroups);
+
+    // Migration from old flat list
+    const savedItems = localStorage.getItem('trainingItems');
+    if (savedItems) {
+      const items = JSON.parse(savedItems);
+      if (items.length > 0) {
+        return [{
+          id: Date.now(), // Generate a unique ID for the default group
+          title: 'Genel',
+          items: items
+        }];
+      }
+    }
+    return [];
   });
-  const [newTrainingItem, setNewTrainingItem] = useState('');
 
-  // Save training items to localStorage
+  const [newGroupName, setNewGroupName] = useState('');
+  // We'll manage "new item" input state per group locally in the render or via a map if needed, 
+  // but for simplicity, we might just use uncontrolled inputs or a map of inputs.
+  // Actually, a simple way is to have a single state object tracking inputs for each group: { [groupId]: 'text' }
+  const [groupInputs, setGroupInputs] = useState({});
+
+  // Save training groups to localStorage
   useEffect(() => {
-    localStorage.setItem('trainingItems', JSON.stringify(trainingItems));
-  }, [trainingItems]);
+    localStorage.setItem('trainingGroups', JSON.stringify(trainingGroups));
+    // Clear old storage to avoid confusion? Better to keep as backup or clear it. 
+    // Let's keep it for safety but we rely on trainingGroups now.
+  }, [trainingGroups]);
 
-  const [showCompleted, setShowCompleted] = useState(false);
+  const handleAddGroup = () => {
+    if (!newGroupName.trim()) return;
+    setTrainingGroups(prev => [...prev, {
+      id: Date.now(),
+      title: newGroupName.trim(),
+      items: []
+    }]);
+    setNewGroupName('');
+  };
 
-  const handleAddTrainingItem = () => {
-    if (!newTrainingItem.trim()) return;
+  const deleteGroup = (groupId) => {
+    if (window.confirm('Bu grubu ve içindeki tüm maddeleri silmek istediğinize emin misiniz?')) {
+      setTrainingGroups(prev => prev.filter(g => g.id !== groupId));
+    }
+  };
 
-    // Split by newlines and filter out empty lines
-    const lines = newTrainingItem.split('\n').filter(line => line.trim());
+  const handleAddTrainingItem = (groupId) => {
+    const text = groupInputs[groupId];
+    if (!text || !text.trim()) return;
 
+    // Split by newlines
+    const lines = text.split('\n').filter(line => line.trim());
     const newItems = lines.map((line, index) => ({
-      id: Date.now() + index, // Ensure unique IDs
+      id: Date.now() + index,
       text: line.trim(),
       completed: false
     }));
 
-    setTrainingItems(prev => [...prev, ...newItems]);
-    setNewTrainingItem('');
+    setTrainingGroups(prev => prev.map(group => {
+      if (group.id === groupId) {
+        return { ...group, items: [...group.items, ...newItems] };
+      }
+      return group;
+    }));
+
+    setGroupInputs(prev => ({ ...prev, [groupId]: '' }));
   };
 
-  const toggleTrainingItem = (id) => {
-    setTrainingItems(prev => prev.map(item =>
-      item.id === id ? { ...item, completed: !item.completed } : item
-    ));
+  const handleGroupInputChange = (groupId, value) => {
+    setGroupInputs(prev => ({ ...prev, [groupId]: value }));
   };
 
-  const removeTrainingItem = (id) => {
-    setTrainingItems(prev => prev.filter(item => item.id !== id));
+  const toggleTrainingItem = (groupId, itemId) => {
+    setTrainingGroups(prev => prev.map(group => {
+      if (group.id === groupId) {
+        return {
+          ...group,
+          items: group.items.map(item =>
+            item.id === itemId ? { ...item, completed: !item.completed } : item
+          )
+        };
+      }
+      return group;
+    }));
   };
 
-  const resetTrainingProgress = () => {
-    if (window.confirm('Tüm ilerleme sıfırlanacak emin misiniz?')) {
-      setTrainingItems(prev => prev.map(item => ({ ...item, completed: false })));
+  const removeTrainingItem = (groupId, itemId) => {
+    setTrainingGroups(prev => prev.map(group => {
+      if (group.id === groupId) {
+        return {
+          ...group,
+          items: group.items.filter(item => item.id !== itemId)
+        };
+      }
+      return group;
+    }));
+  };
+
+  const resetAllProgress = () => {
+    if (window.confirm('Tüm gruplardaki ilerleme sıfırlanacak emin misiniz?')) {
+      setTrainingGroups(prev => prev.map(group => ({
+        ...group,
+        items: group.items.map(item => ({ ...item, completed: false }))
+      })));
     }
+  };
+
+  const resetGroupProgress = (groupId) => {
+    setTrainingGroups(prev => prev.map(group => {
+      if (group.id === groupId) {
+        return {
+          ...group,
+          items: group.items.map(item => ({ ...item, completed: false }))
+        };
+      }
+      return group;
+    }));
   };
 
   const handleNoteChange = (day, value) => {
@@ -595,6 +671,19 @@ function App() {
                 </div>
               )}
             </div>
+            {/* Today's Note */}
+            <div className="bg-white p-3 rounded-xl shadow-sm border border-slate-100 mt-2">
+              <div className="flex items-center gap-2">
+                <Edit3 size={18} className="text-slate-400" />
+                <input
+                  type="text"
+                  value={notes[new Date().getDate()] || ''}
+                  onChange={(e) => handleNoteChange(new Date().getDate(), e.target.value)}
+                  placeholder={getNotePlaceholder(todayAssignments)}
+                  className="w-full text-base bg-transparent border-none focus:ring-0 p-0 italic text-[#6b1225] placeholder:text-[#b95b75]"
+                />
+              </div>
+            </div>
 
             {/* Upcoming Schedule */}
             <div>
@@ -756,149 +845,181 @@ function App() {
 
 
         {activeTab === 'training' && (
-          <div className="space-y-4">
+          <div className="space-y-6">
+
+            {/* Add Group Section */}
             <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h2 className="text-xl font-bold text-slate-800">Antrenman Programı</h2>
-                  <p className="text-slate-500 text-sm">
-                    {trainingItems.filter(i => i.completed).length}/{trainingItems.length} tamamlandı
-                  </p>
-                </div>
-                {trainingItems.some(i => i.completed) && (
-                  <button
-                    onClick={resetTrainingProgress}
-                    className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-1 rounded hover:bg-slate-200 transition-colors"
-                  >
-                    Sıfırla
-                  </button>
-                )}
+              <h3 className="font-bold text-slate-700 mb-2">Yeni Grup Ekle</h3>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newGroupName}
+                  onChange={(e) => setNewGroupName(e.target.value)}
+                  placeholder="Örn: Koşu, Ağırlık..."
+                  className="flex-1 rounded-lg border-slate-200 focus:border-primary focus:ring-primary"
+                />
+                <button
+                  onClick={handleAddGroup}
+                  className="bg-primary text-white px-4 py-2 rounded-lg font-medium hover:bg-sky-600 transition-colors"
+                >
+                  Ekle
+                </button>
               </div>
+            </div>
 
-              {/* Progress Bar */}
-              {trainingItems.length > 0 && (
-                <div className="w-full bg-slate-100 rounded-full h-2.5 mb-6">
-                  <div
-                    className="bg-green-500 h-2.5 rounded-full transition-all duration-500 ease-out"
-                    style={{ width: `${(trainingItems.filter(i => i.completed).length / trainingItems.length) * 100}%` }}
-                  ></div>
-                </div>
-              )}
+            {/* Groups */}
+            {trainingGroups.map(group => {
+              const completedCount = group.items.filter(i => i.completed).length;
+              const totalCount = group.items.length;
+              const progress = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
 
-              {trainingItems.length > 0 ? (
-                <div className="space-y-4">
-                  {/* Active Items */}
-                  <div className="space-y-2">
-                    {trainingItems.filter(i => !i.completed).map(item => (
-                      <div
-                        key={item.id}
-                        onClick={() => toggleTrainingItem(item.id)}
-                        className="p-3 rounded-lg border bg-white border-slate-200 hover:border-primary flex items-center gap-3 cursor-pointer transition-all"
+              return (
+                <div key={group.id} className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h2 className="text-xl font-bold text-slate-800">{group.title}</h2>
+                      <p className="text-slate-500 text-sm">
+                        {completedCount}/{totalCount} tamamlandı
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {completedCount > 0 && (
+                        <button
+                          onClick={() => resetGroupProgress(group.id)}
+                          className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-1 rounded hover:bg-slate-200 transition-colors"
+                        >
+                          Sıfırla
+                        </button>
+                      )}
+                      <button
+                        onClick={() => deleteGroup(group.id)}
+                        className="p-1.5 text-red-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                       >
-                        <div className="w-6 h-6 rounded-full flex items-center justify-center border-2 border-slate-300 transition-colors">
-                        </div>
-                        <span className="flex-1 font-medium text-lg text-slate-800">
-                          {item.text}
-                        </span>
-                      </div>
-                    ))}
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
                   </div>
 
-                  {/* Completed Items (Collapsible) */}
-                  {trainingItems.some(i => i.completed) && (
-                    <div className="border-t border-slate-100 pt-2">
-                      <button
-                        onClick={() => setShowCompleted(!showCompleted)}
-                        className="flex items-center gap-2 text-slate-500 font-medium text-sm mb-2 hover:text-slate-700 w-full"
-                      >
-                        {showCompleted ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                        Tamamlananlar ({trainingItems.filter(i => i.completed).length})
-                      </button>
-
-                      {showCompleted && (
-                        <div className="space-y-2">
-                          {trainingItems.filter(i => i.completed).map(item => (
-                            <div
-                              key={item.id}
-                              onClick={() => toggleTrainingItem(item.id)}
-                              className="p-3 rounded-lg border bg-green-50 border-green-100 flex items-center gap-3 cursor-pointer transition-all opacity-75"
-                            >
-                              <div className="w-6 h-6 rounded-full flex items-center justify-center border-2 bg-green-500 border-green-500 text-white transition-colors">
-                                <CheckCircle size={14} />
-                              </div>
-                              <span className="flex-1 font-medium text-lg text-slate-400 line-through">
-                                {item.text}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                  {/* Progress Bar */}
+                  {totalCount > 0 && (
+                    <div className="w-full bg-slate-100 rounded-full h-2.5 mb-6">
+                      <div
+                        className="bg-green-500 h-2.5 rounded-full transition-all duration-500 ease-out"
+                        style={{ width: `${progress}%` }}
+                      ></div>
                     </div>
                   )}
+
+                  <div className="space-y-4">
+                    {/* Active Items */}
+                    <div className="space-y-2">
+                      {group.items.filter(i => !i.completed).map(item => (
+                        <div
+                          key={item.id}
+                          onClick={() => toggleTrainingItem(group.id, item.id)}
+                          className="p-3 rounded-lg border bg-white border-slate-200 hover:border-primary flex items-center gap-3 cursor-pointer transition-all"
+                        >
+                          <div className="w-6 h-6 rounded-full flex items-center justify-center border-2 border-slate-300 transition-colors">
+                          </div>
+                          <span className="flex-1 font-medium text-lg text-slate-800">
+                            {item.text}
+                          </span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeTrainingItem(group.id, item.id);
+                            }}
+                            className="text-slate-300 hover:text-red-400 p-1"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Completed Items */}
+                    {group.items.some(i => i.completed) && (
+                      <div className="space-y-2 opacity-75">
+                        {group.items.filter(i => i.completed).map(item => (
+                          <div
+                            key={item.id}
+                            onClick={() => toggleTrainingItem(group.id, item.id)}
+                            className="p-3 rounded-lg border bg-green-50 border-green-100 flex items-center gap-3 cursor-pointer transition-all"
+                          >
+                            <div className="w-6 h-6 rounded-full flex items-center justify-center border-2 bg-green-500 border-green-500 text-white transition-colors">
+                              <CheckCircle size={14} />
+                            </div>
+                            <span className="flex-1 font-medium text-lg text-slate-400 line-through">
+                              {item.text}
+                            </span>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeTrainingItem(group.id, item.id);
+                              }}
+                              className="text-slate-300 hover:text-red-400 p-1"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Add Item Input */}
+                    <div className="flex gap-2 mt-4 pt-4 border-t border-slate-100">
+                      <textarea
+                        value={groupInputs[group.id] || ''}
+                        onChange={(e) => handleGroupInputChange(group.id, e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            handleAddTrainingItem(group.id);
+                          }
+                        }}
+                        placeholder="Yeni madde ekle... (Çoklu satır yapıştırabilirsiniz)"
+                        className="flex-1 rounded-lg border-slate-200 focus:border-primary focus:ring-primary text-sm min-h-[42px] py-2.5 resize-none overflow-hidden"
+                        rows={1}
+                        style={{ height: 'auto' }}
+                        onInput={(e) => {
+                          e.target.style.height = 'auto';
+                          e.target.style.height = e.target.scrollHeight + 'px';
+                        }}
+                      />
+                      <button
+                        onClick={() => handleAddTrainingItem(group.id)}
+                        className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 h-fit"
+                      >
+                        <Plus size={20} />
+                      </button>
+                    </div>
+                  </div>
                 </div>
-              ) : (
-                <div className="text-center py-8 text-slate-400">
-                  <Activity size={32} className="mx-auto mb-2 opacity-50" />
-                  <p>Henüz program eklenmemiş.</p>
-                  <button
-                    onClick={() => setActiveTab('files')}
-                    className="mt-2 text-primary font-medium hover:underline"
-                  >
-                    Dosyalar sekmesinden ekle
-                  </button>
-                </div>
-              )}
-            </div>
+              );
+            })}
+
+            {trainingGroups.length === 0 && (
+              <div className="text-center py-8 text-slate-400">
+                <p>Henüz bir antrenman grubu yok. Yukarıdan ekleyebilirsiniz.</p>
+              </div>
+            )}
+
+            {trainingGroups.length > 0 && (
+              <button
+                onClick={resetAllProgress}
+                className="w-full py-3 text-red-500 bg-red-50 rounded-xl font-medium hover:bg-red-100 transition-colors"
+              >
+                Tüm İlerlemeyi Sıfırla
+              </button>
+            )}
+
           </div>
         )}
 
         {activeTab === 'files' && (
           <div className="flex flex-col items-center justify-start min-h-[60vh] text-slate-400 p-4 space-y-6">
 
-            {/* Training Program Input Section */}
-            <div className="w-full max-w-sm bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-              <div className="flex items-center gap-3 mb-4">
-                <Activity size={24} className="text-primary" />
-                <h3 className="text-lg font-bold text-slate-800">Antrenman Ekle</h3>
-              </div>
 
-              <div className="space-y-3">
-                <textarea
-                  value={newTrainingItem}
-                  onChange={(e) => setNewTrainingItem(e.target.value)}
-                  placeholder="Örn: 5 km yavaş tempo koşu..."
-                  className="w-full p-3 rounded-xl border border-slate-200 focus:border-primary focus:ring-1 focus:ring-primary outline-none text-slate-700 min-h-[80px] resize-none"
-                />
-                <button
-                  onClick={handleAddTrainingItem}
-                  disabled={!newTrainingItem.trim()}
-                  className="w-full py-2.5 bg-primary text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-sky-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Plus size={18} />
-                  Listeye Ekle
-                </button>
-              </div>
-
-              {/* Preview of added items */}
-              {trainingItems.length > 0 && (
-                <div className="mt-6 pt-4 border-t border-slate-100">
-                  <h4 className="text-xs font-bold text-slate-400 uppercase mb-3">Eklenen Program ({trainingItems.length})</h4>
-                  <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
-                    {trainingItems.map(item => (
-                      <div key={item.id} className="flex items-center justify-between p-2 bg-slate-50 rounded-lg text-sm group">
-                        <span className="text-slate-700 truncate mr-2">{item.text}</span>
-                        <button
-                          onClick={() => removeTrainingItem(item.id)}
-                          className="text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all p-1"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
 
             <div className="w-full max-w-sm bg-white p-6 rounded-2xl shadow-sm border border-slate-100 text-center">
               <FileText size={48} className="mx-auto mb-4 text-slate-300" />
