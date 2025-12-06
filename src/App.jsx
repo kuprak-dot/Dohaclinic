@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, FileText, Bell, Clock, MapPin, Sun, Edit3, ChevronDown, ChevronUp, Plus, X, Download, Newspaper, ExternalLink, TrendingUp, Activity, CheckCircle, Trash2 } from 'lucide-react';
+import { Calendar, FileText, Bell, Clock, MapPin, Sun, Edit3, ChevronDown, ChevronUp, Plus, X, Download, Newspaper, ExternalLink, TrendingUp, Activity, CheckCircle, Trash2, Tag } from 'lucide-react';
 import { spanishWords } from './spanishWords';
 import { parseScheduleFile, generateICS } from './utils/parser';
 import { saveAs } from 'file-saver';
@@ -278,6 +278,18 @@ function App() {
       ...prev,
       [day]: value
     }));
+  };
+
+  // Quick Note Tags
+  const [activeNoteModalDay, setActiveNoteModalDay] = useState(null);
+  const noteTags = ["Koşu Antrenman", "Üst Vct", "Total -Core", "Alt Vct"];
+
+  const handleAddTag = (tag) => {
+    if (!activeNoteModalDay) return;
+    const currentNote = notes[activeNoteModalDay] || '';
+    const newNote = currentNote ? `${currentNote} ${tag}` : tag;
+    handleNoteChange(activeNoteModalDay, newNote);
+    setActiveNoteModalDay(null);
   };
 
   // Hide a JSON schedule entry
@@ -680,8 +692,14 @@ function App() {
                   value={notes[new Date().getDate()] || ''}
                   onChange={(e) => handleNoteChange(new Date().getDate(), e.target.value)}
                   placeholder={getNotePlaceholder(todayAssignments)}
-                  className="w-full text-base bg-transparent border-none focus:ring-0 p-0 italic text-[#6b1225] placeholder:text-[#b95b75]"
+                  className="flex-1 text-lg font-bold italic bg-transparent border-none focus:ring-0 p-0 text-[#6b1225] placeholder:text-[#b95b75]/70"
                 />
+                <button
+                  onClick={() => setActiveNoteModalDay(new Date().getDate())}
+                  className="p-1.5 text-slate-400 hover:text-primary hover:bg-slate-50 rounded-lg transition-colors"
+                >
+                  <Tag size={16} />
+                </button>
               </div>
             </div>
 
@@ -786,8 +804,14 @@ function App() {
                                     value={notes[day.day] || ''}
                                     onChange={(e) => handleNoteChange(day.day, e.target.value)}
                                     placeholder={placeholder}
-                                    className="w-full text-base bg-transparent border-none focus:ring-0 p-0 italic text-[#6b1225] placeholder:text-[#b95b75]"
+                                    className="flex-1 text-lg font-bold italic bg-transparent border-none focus:ring-0 p-0 text-[#6b1225] placeholder:text-[#b95b75]/70"
                                   />
+                                  <button
+                                    onClick={() => setActiveNoteModalDay(day.day)}
+                                    className="p-1.5 text-slate-400 hover:text-primary hover:bg-slate-50 rounded-lg transition-colors"
+                                  >
+                                    <Tag size={16} />
+                                  </button>
                                 </div>
                               </div>
                             </div>
@@ -1215,6 +1239,34 @@ function App() {
           </button>
         </div>
       </nav>
+      {/* Quick Add Tag Modal */}
+      {activeNoteModalDay && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setActiveNoteModalDay(null)}>
+          <div className="bg-white rounded-2xl w-full max-w-sm p-4 space-y-4 shadow-xl animate-in fade-in zoom-in duration-200" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-lg text-slate-800">Hızlı Ekle</h3>
+              <button
+                onClick={() => setActiveNoteModalDay(null)}
+                className="p-2 text-slate-400 hover:bg-slate-100 rounded-full"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              {noteTags.map((tag) => (
+                <button
+                  key={tag}
+                  onClick={() => handleAddTag(tag)}
+                  className="p-3 text-sm font-medium text-slate-700 bg-slate-50 hover:bg-primary hover:text-white rounded-xl border border-slate-200 transition-colors"
+                >
+                  {tag}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
