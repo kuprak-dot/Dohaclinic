@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, FileText, Bell, Clock, MapPin, Sun, Edit3, ChevronDown, ChevronUp, Plus, X, Download, Newspaper, ExternalLink, TrendingUp } from 'lucide-react';
+import { Calendar, FileText, Bell, Clock, MapPin, Sun, Edit3, ChevronDown, ChevronUp, Plus, X, Download, Newspaper, ExternalLink, TrendingUp, Activity, CheckCircle, Trash2 } from 'lucide-react';
 import { spanishWords } from './spanishWords';
 import { parseScheduleFile, generateICS } from './utils/parser';
 import { saveAs } from 'file-saver';
@@ -150,6 +150,52 @@ function App() {
   useEffect(() => {
     localStorage.setItem('hiddenDuties', JSON.stringify(hiddenDuties));
   }, [hiddenDuties]);
+
+  // Training Program State
+  const [trainingItems, setTrainingItems] = useState(() => {
+    const saved = localStorage.getItem('trainingItems');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [newTrainingItem, setNewTrainingItem] = useState('');
+
+  // Save training items to localStorage
+  useEffect(() => {
+    localStorage.setItem('trainingItems', JSON.stringify(trainingItems));
+  }, [trainingItems]);
+
+  const [showCompleted, setShowCompleted] = useState(false);
+
+  const handleAddTrainingItem = () => {
+    if (!newTrainingItem.trim()) return;
+
+    // Split by newlines and filter out empty lines
+    const lines = newTrainingItem.split('\n').filter(line => line.trim());
+
+    const newItems = lines.map((line, index) => ({
+      id: Date.now() + index, // Ensure unique IDs
+      text: line.trim(),
+      completed: false
+    }));
+
+    setTrainingItems(prev => [...prev, ...newItems]);
+    setNewTrainingItem('');
+  };
+
+  const toggleTrainingItem = (id) => {
+    setTrainingItems(prev => prev.map(item =>
+      item.id === id ? { ...item, completed: !item.completed } : item
+    ));
+  };
+
+  const removeTrainingItem = (id) => {
+    setTrainingItems(prev => prev.filter(item => item.id !== id));
+  };
+
+  const resetTrainingProgress = () => {
+    if (window.confirm('Tüm ilerleme sıfırlanacak emin misiniz?')) {
+      setTrainingItems(prev => prev.map(item => ({ ...item, completed: false })));
+    }
+  };
 
   const handleNoteChange = (day, value) => {
     setNotes(prev => ({
@@ -708,8 +754,152 @@ function App() {
           </div>
         )}
 
+
+        {activeTab === 'training' && (
+          <div className="space-y-4">
+            <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="text-xl font-bold text-slate-800">Antrenman Programı</h2>
+                  <p className="text-slate-500 text-sm">
+                    {trainingItems.filter(i => i.completed).length}/{trainingItems.length} tamamlandı
+                  </p>
+                </div>
+                {trainingItems.some(i => i.completed) && (
+                  <button
+                    onClick={resetTrainingProgress}
+                    className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-1 rounded hover:bg-slate-200 transition-colors"
+                  >
+                    Sıfırla
+                  </button>
+                )}
+              </div>
+
+              {/* Progress Bar */}
+              {trainingItems.length > 0 && (
+                <div className="w-full bg-slate-100 rounded-full h-2.5 mb-6">
+                  <div
+                    className="bg-green-500 h-2.5 rounded-full transition-all duration-500 ease-out"
+                    style={{ width: `${(trainingItems.filter(i => i.completed).length / trainingItems.length) * 100}%` }}
+                  ></div>
+                </div>
+              )}
+
+              {trainingItems.length > 0 ? (
+                <div className="space-y-4">
+                  {/* Active Items */}
+                  <div className="space-y-2">
+                    {trainingItems.filter(i => !i.completed).map(item => (
+                      <div
+                        key={item.id}
+                        onClick={() => toggleTrainingItem(item.id)}
+                        className="p-3 rounded-lg border bg-white border-slate-200 hover:border-primary flex items-center gap-3 cursor-pointer transition-all"
+                      >
+                        <div className="w-6 h-6 rounded-full flex items-center justify-center border-2 border-slate-300 transition-colors">
+                        </div>
+                        <span className="flex-1 font-medium text-lg text-slate-800">
+                          {item.text}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Completed Items (Collapsible) */}
+                  {trainingItems.some(i => i.completed) && (
+                    <div className="border-t border-slate-100 pt-2">
+                      <button
+                        onClick={() => setShowCompleted(!showCompleted)}
+                        className="flex items-center gap-2 text-slate-500 font-medium text-sm mb-2 hover:text-slate-700 w-full"
+                      >
+                        {showCompleted ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                        Tamamlananlar ({trainingItems.filter(i => i.completed).length})
+                      </button>
+
+                      {showCompleted && (
+                        <div className="space-y-2">
+                          {trainingItems.filter(i => i.completed).map(item => (
+                            <div
+                              key={item.id}
+                              onClick={() => toggleTrainingItem(item.id)}
+                              className="p-3 rounded-lg border bg-green-50 border-green-100 flex items-center gap-3 cursor-pointer transition-all opacity-75"
+                            >
+                              <div className="w-6 h-6 rounded-full flex items-center justify-center border-2 bg-green-500 border-green-500 text-white transition-colors">
+                                <CheckCircle size={14} />
+                              </div>
+                              <span className="flex-1 font-medium text-lg text-slate-400 line-through">
+                                {item.text}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-slate-400">
+                  <Activity size={32} className="mx-auto mb-2 opacity-50" />
+                  <p>Henüz program eklenmemiş.</p>
+                  <button
+                    onClick={() => setActiveTab('files')}
+                    className="mt-2 text-primary font-medium hover:underline"
+                  >
+                    Dosyalar sekmesinden ekle
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {activeTab === 'files' && (
           <div className="flex flex-col items-center justify-start min-h-[60vh] text-slate-400 p-4 space-y-6">
+
+            {/* Training Program Input Section */}
+            <div className="w-full max-w-sm bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+              <div className="flex items-center gap-3 mb-4">
+                <Activity size={24} className="text-primary" />
+                <h3 className="text-lg font-bold text-slate-800">Antrenman Ekle</h3>
+              </div>
+
+              <div className="space-y-3">
+                <textarea
+                  value={newTrainingItem}
+                  onChange={(e) => setNewTrainingItem(e.target.value)}
+                  placeholder="Örn: 5 km yavaş tempo koşu..."
+                  className="w-full p-3 rounded-xl border border-slate-200 focus:border-primary focus:ring-1 focus:ring-primary outline-none text-slate-700 min-h-[80px] resize-none"
+                />
+                <button
+                  onClick={handleAddTrainingItem}
+                  disabled={!newTrainingItem.trim()}
+                  className="w-full py-2.5 bg-primary text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-sky-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Plus size={18} />
+                  Listeye Ekle
+                </button>
+              </div>
+
+              {/* Preview of added items */}
+              {trainingItems.length > 0 && (
+                <div className="mt-6 pt-4 border-t border-slate-100">
+                  <h4 className="text-xs font-bold text-slate-400 uppercase mb-3">Eklenen Program ({trainingItems.length})</h4>
+                  <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                    {trainingItems.map(item => (
+                      <div key={item.id} className="flex items-center justify-between p-2 bg-slate-50 rounded-lg text-sm group">
+                        <span className="text-slate-700 truncate mr-2">{item.text}</span>
+                        <button
+                          onClick={() => removeTrainingItem(item.id)}
+                          className="text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all p-1"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
             <div className="w-full max-w-sm bg-white p-6 rounded-2xl shadow-sm border border-slate-100 text-center">
               <FileText size={48} className="mx-auto mb-4 text-slate-300" />
               <h3 className="text-lg font-bold text-slate-800 mb-2">Program Yükle</h3>
@@ -877,22 +1067,32 @@ function App() {
       )}
 
       {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-6 py-3 flex justify-around items-center z-20 safe-area-bottom shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-        <button
-          onClick={() => setActiveTab('schedule')}
-          className={`flex flex-col items-center gap-1 p-2 rounded-lg transition-colors ${activeTab === 'schedule' ? 'text-primary' : 'text-slate-400 hover:text-slate-600'}`}
-        >
-          <Calendar size={28} />
-          <span className="text-xs font-bold">Program</span>
-        </button>
+      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 pb-safe z-10 px-6 py-3">
+        <div className="flex items-center justify-around max-w-md mx-auto">
+          <button
+            onClick={() => setActiveTab('schedule')}
+            className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'schedule' ? 'text-primary' : 'text-slate-400'}`}
+          >
+            <Calendar size={24} strokeWidth={activeTab === 'schedule' ? 2.5 : 2} />
+            <span className="text-[10px] font-medium">Program</span>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('files')}
-          className={`flex flex-col items-center gap-1 p-2 rounded-lg transition-colors ${activeTab === 'files' ? 'text-primary' : 'text-slate-400 hover:text-slate-600'}`}
-        >
-          <FileText size={28} />
-          <span className="text-xs font-bold">Dosyalar</span>
-        </button>
+          <button
+            onClick={() => setActiveTab('training')}
+            className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'training' ? 'text-primary' : 'text-slate-400'}`}
+          >
+            <Activity size={24} strokeWidth={activeTab === 'training' ? 2.5 : 2} />
+            <span className="text-[10px] font-medium">Antrenman</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('files')}
+            className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'files' ? 'text-primary' : 'text-slate-400'}`}
+          >
+            <FileText size={24} strokeWidth={activeTab === 'files' ? 2.5 : 2} />
+            <span className="text-[10px] font-medium">Dosyalar</span>
+          </button>
+        </div>
       </nav>
     </div>
   );
