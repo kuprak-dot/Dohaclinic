@@ -177,6 +177,10 @@ function App() {
   // Actually, a simple way is to have a single state object tracking inputs for each group: { [groupId]: 'text' }
   const [groupInputs, setGroupInputs] = useState({});
 
+  // Modal state for adding training items
+  const [showAddTrainingItemModal, setShowAddTrainingItemModal] = useState(false);
+  const [activeGroupForModal, setActiveGroupForModal] = useState(null);
+
   // Save training groups to localStorage
   useEffect(() => {
     localStorage.setItem('trainingGroups', JSON.stringify(trainingGroups));
@@ -990,31 +994,20 @@ function App() {
                       </div>
                     )}
 
-                    {/* Add Item Input */}
-                    <div className="flex gap-2 mt-4 pt-4 border-t border-slate-100">
-                      <textarea
-                        value={groupInputs[group.id] || ''}
-                        onChange={(e) => handleGroupInputChange(group.id, e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault();
-                            handleAddTrainingItem(group.id);
-                          }
-                        }}
-                        placeholder="Yeni madde ekle... (Çoklu satır yapıştırabilirsiniz)"
-                        className="flex-1 rounded-lg border-slate-200 focus:border-primary focus:ring-primary text-sm min-h-[42px] py-2.5 resize-none overflow-hidden"
-                        rows={1}
-                        style={{ height: 'auto' }}
-                        onInput={(e) => {
-                          e.target.style.height = 'auto';
-                          e.target.style.height = e.target.scrollHeight + 'px';
-                        }}
-                      />
+                    {/* Add Item Button (Opens Modal) */}
+                    <div className="mt-4 pt-4 border-t border-slate-100">
                       <button
-                        onClick={() => handleAddTrainingItem(group.id)}
-                        className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 h-fit"
+                        onClick={() => {
+                          setActiveGroupForModal(group.id);
+                          // Pre-fill if there was draft text? Maybe not needed for now, fresh start is cleaner.
+                          // But if we want to support draft, we could set groupInputs first. 
+                          // Let's keep it simple and just open modal.
+                          setShowAddTrainingItemModal(true);
+                        }}
+                        className="w-full py-3 bg-slate-50 text-slate-600 rounded-lg hover:bg-slate-100 border border-slate-200 border-dashed flex items-center justify-center gap-2 font-medium transition-colors"
                       >
-                        <Plus size={20} />
+                        <Plus size={18} />
+                        Yeni Madde Ekle
                       </button>
                     </div>
                   </div>
@@ -1263,6 +1256,53 @@ function App() {
                   {tag}
                 </button>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Training Item Modal */}
+      {showAddTrainingItemModal && activeGroupForModal && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-0 sm:p-4 bg-black/50"
+          onClick={() => setShowAddTrainingItemModal(false)}>
+          <div
+            className="bg-white rounded-t-2xl sm:rounded-2xl w-full max-w-sm p-5 space-y-4 shadow-xl animate-in slide-in-from-bottom duration-300"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="font-bold text-lg text-slate-800">Antrenman Ekle</h3>
+              <button
+                onClick={() => setShowAddTrainingItemModal(false)}
+                className="p-2 text-slate-400 hover:bg-slate-100 rounded-full"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div>
+              <textarea
+                value={groupInputs[activeGroupForModal] || ''}
+                onChange={(e) => handleGroupInputChange(activeGroupForModal, e.target.value)}
+                autoFocus
+                placeholder="Yapılacak hareketi veya programı buraya yazın..."
+                className="w-full p-3 border border-slate-200 rounded-xl text-base focus:ring-2 focus:ring-primary focus:border-primary resize-none"
+                rows={5}
+              />
+              <p className="text-xs text-slate-400 mt-2 text-right">
+                Enter tuşu yeni satır ekler
+              </p>
+            </div>
+
+            <div className="pt-2">
+              <button
+                onClick={() => {
+                  handleAddTrainingItem(activeGroupForModal);
+                  setShowAddTrainingItemModal(false);
+                }}
+                className="w-full py-3 bg-primary text-white rounded-xl font-bold hover:bg-sky-600 transition-colors shadow-sm"
+              >
+                Ekle
+              </button>
             </div>
           </div>
         </div>
