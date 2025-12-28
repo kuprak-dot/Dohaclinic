@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, FileText, Bell, Clock, MapPin, Sun, Edit3, ChevronDown, ChevronUp, Plus, X, Download, Newspaper, ExternalLink, TrendingUp, Activity, CheckCircle, Trash2, Tag, ArrowUp, ArrowDown, Save, Palette, Bold } from 'lucide-react';
+import { Calendar, FileText, Bell, Clock, MapPin, Sun, Edit3, ChevronDown, ChevronUp, Plus, X, Download, Newspaper, ExternalLink, TrendingUp, Activity, CheckCircle, Trash2, Tag, ArrowUp, ArrowDown, Save, Palette, Bold, ChevronRight } from 'lucide-react';
 import { spanishWords } from './spanishWords';
 import { parseScheduleFile, generateICS } from './utils/parser';
 import { saveAs } from 'file-saver';
@@ -200,6 +200,7 @@ function App() {
   // Modal state for adding training items
   const [showAddTrainingItemModal, setShowAddTrainingItemModal] = useState(false);
   const [activeGroupForModal, setActiveGroupForModal] = useState(null);
+  const [selectedWorkoutGroupId, setSelectedWorkoutGroupId] = useState(null);
 
   // Save training groups to localStorage
   useEffect(() => {
@@ -1106,234 +1107,32 @@ function App() {
               const progress = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
 
               return (
-                <div key={group.id} className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      {editingGroupId === group.id ? (
-                        <input
-                          type="text"
-                          value={editingGroupTitle}
-                          onChange={(e) => setEditingGroupTitle(e.target.value)}
-                          onBlur={() => updateGroupTitle(group.id)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') updateGroupTitle(group.id);
-                            if (e.key === 'Escape') setEditingGroupId(null);
-                          }}
-                          autoFocus
-                          className="text-xl font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 focus:ring-2 focus:ring-primary focus:border-primary"
-                        />
-                      ) : (
-                        <h2
-                          className="text-xl font-bold text-slate-800 cursor-pointer hover:text-primary transition-colors"
-                          onClick={() => {
-                            setEditingGroupId(group.id);
-                            setEditingGroupTitle(group.title);
-                          }}
-                          title="Tıklayarak adı düzenle"
-                        >
-                          {group.title} <Edit3 size={14} className="inline-block ml-1 text-slate-400" />
-                        </h2>
-                      )}
-                      <p className="text-slate-500 text-sm">
-                        {completedCount}/{totalCount} tamamlandı
-                      </p>
-                    </div>
+                <div
+                  key={group.id}
+                  onClick={() => setSelectedWorkoutGroupId(group.id)}
+                  className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 cursor-pointer hover:border-primary/30 transition-all group"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <h2 className="text-lg font-bold text-slate-800 transition-colors group-hover:text-primary">
+                      {group.title}
+                    </h2>
                     <div className="flex items-center gap-2">
-                      {completedCount > 0 && (
-                        <button
-                          onClick={() => resetGroupProgress(group.id)}
-                          className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-1 rounded hover:bg-slate-200 transition-colors"
-                        >
-                          Sıfırla
-                        </button>
-                      )}
-                      <button
-                        onClick={() => deleteGroup(group.id)}
-                        className="p-1.5 text-red-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                      >
-                        <Trash2 size={18} />
-                      </button>
+                      <span className="text-slate-500 text-sm font-medium">
+                        {completedCount}/{totalCount}
+                      </span>
+                      <ChevronRight size={20} className="text-slate-300 group-hover:text-primary transition-colors" />
                     </div>
                   </div>
 
                   {/* Progress Bar */}
                   {totalCount > 0 && (
-                    <div className="w-full bg-slate-100 rounded-full h-2.5 mb-6">
+                    <div className="w-full bg-slate-100 rounded-full h-2">
                       <div
-                        className="bg-green-500 h-2.5 rounded-full transition-all duration-500 ease-out"
+                        className="bg-green-500 h-2 rounded-full transition-all duration-500 ease-out"
                         style={{ width: `${progress}%` }}
                       ></div>
                     </div>
                   )}
-
-                  <div className="space-y-4">
-                    {/* Active Items */}
-                    <div className="space-y-2">
-                      {group.items.filter(i => !i.completed).map((item, index) => {
-                        const isEditing = editingItem?.itemId === item.id;
-
-                        if (isEditing) {
-                          return (
-                            <div key={item.id} className="p-3 rounded-lg border border-primary bg-primary/5 space-y-3">
-                              <input
-                                type="text"
-                                value={editingItem.text}
-                                onChange={(e) => setEditingItem(prev => ({ ...prev, text: e.target.value }))}
-                                className="w-full p-2 border border-slate-300 rounded-lg text-lg"
-                                autoFocus
-                              />
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                  {/* Colors */}
-                                  {[
-                                    { class: 'text-slate-800', bg: 'bg-slate-800' },
-                                    { class: 'text-red-600', bg: 'bg-red-600' },
-                                    { class: 'text-blue-600', bg: 'bg-blue-600' },
-                                    { class: 'text-green-600', bg: 'bg-green-600' },
-                                    { class: 'text-purple-600', bg: 'bg-purple-600' }
-                                  ].map((c) => (
-                                    <button
-                                      key={c.class}
-                                      onClick={() => setEditingItem(prev => ({ ...prev, color: c.class }))}
-                                      className={`w-6 h-6 rounded-full ${c.bg} ${editingItem.color === c.class ? 'ring-2 ring-offset-2 ring-primary' : ''}`}
-                                    />
-                                  ))}
-                                  <div className="w-px h-6 bg-slate-300 mx-1"></div>
-                                  <button
-                                    onClick={() => setEditingItem(prev => ({ ...prev, isBold: !prev.isBold }))}
-                                    className={`p-1.5 rounded-lg ${editingItem.isBold ? 'bg-slate-200 text-slate-800' : 'text-slate-400 hover:bg-slate-100'}`}
-                                  >
-                                    <Bold size={18} />
-                                  </button>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <button
-                                    onClick={() => setEditingItem(null)}
-                                    className="px-3 py-1.5 text-slate-500 hover:bg-slate-100 rounded-lg text-sm font-medium"
-                                  >
-                                    İptal
-                                  </button>
-                                  <button
-                                    onClick={handleSaveItem}
-                                    className="px-3 py-1.5 bg-primary text-white rounded-lg text-sm font-medium flex items-center gap-1"
-                                  >
-                                    <Save size={16} /> Kaydet
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        }
-
-                        return (
-                          <div
-                            key={item.id}
-                            className="group p-3 rounded-lg border bg-white border-slate-200 flex flex-col gap-2 transition-all hover:border-slate-300"
-                          >
-                            <div className="flex items-start gap-3">
-                              <div
-                                onClick={() => toggleTrainingItem(group.id, item.id)}
-                                className="mt-1 w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center border-2 border-slate-300 cursor-pointer hover:border-primary transition-colors"
-                              >
-                              </div>
-                              <span
-                                onClick={() => toggleTrainingItem(group.id, item.id)}
-                                className={`flex-1 text-lg cursor-pointer ${item.color || 'text-slate-800'} ${item.isBold ? 'font-bold' : 'font-medium'}`}
-                              >
-                                {item.text}
-                              </span>
-                            </div>
-
-                            {/* Controls Row - Visible slightly always, fully on group hover */}
-                            <div className="flex items-center justify-end gap-1 pt-2 border-t border-slate-50 mt-1 opacity-60 group-hover:opacity-100 transition-opacity">
-                              <button
-                                onClick={() => moveItem(group.id, index, -1)}
-                                disabled={index === 0}
-                                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded disabled:opacity-30"
-                              >
-                                <ArrowUp size={16} />
-                              </button>
-                              <button
-                                onClick={() => moveItem(group.id, index, 1)}
-                                disabled={index === group.items.filter(i => !i.completed).length - 1} // Logic slightly imperfect if mixed with completed, but okay for active list
-                                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded disabled:opacity-30"
-                              >
-                                <ArrowDown size={16} />
-                              </button>
-                              <div className="w-px h-4 bg-slate-200 mx-1"></div>
-                              <button
-                                onClick={() => setEditingItem({
-                                  groupId: group.id,
-                                  itemId: item.id,
-                                  text: item.text,
-                                  color: item.color || 'text-slate-800',
-                                  isBold: item.isBold || false
-                                })}
-                                className="p-1.5 text-blue-400 hover:text-blue-600 hover:bg-blue-50 rounded"
-                              >
-                                <Edit3 size={16} />
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  removeTrainingItem(group.id, item.id);
-                                }}
-                                className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded"
-                              >
-                                <Trash2 size={16} />
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {/* Completed Items */}
-                    {group.items.some(i => i.completed) && (
-                      <div className="space-y-2 opacity-75">
-                        {group.items.filter(i => i.completed).map(item => (
-                          <div
-                            key={item.id}
-                            onClick={() => toggleTrainingItem(group.id, item.id)}
-                            className="p-3 rounded-lg border bg-green-50 border-green-100 flex items-center gap-3 cursor-pointer transition-all"
-                          >
-                            <div className="w-6 h-6 rounded-full flex items-center justify-center border-2 bg-green-500 border-green-500 text-white transition-colors">
-                              <CheckCircle size={14} />
-                            </div>
-                            <span className="flex-1 font-medium text-lg text-slate-400 line-through">
-                              {item.text}
-                            </span>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                removeTrainingItem(group.id, item.id);
-                              }}
-                              className="text-slate-300 hover:text-red-400 p-1"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Add Item Button (Opens Modal) */}
-                    <div className="mt-4 pt-4 border-t border-slate-100">
-                      <button
-                        onClick={() => {
-                          setActiveGroupForModal(group.id);
-                          // Pre-fill if there was draft text? Maybe not needed for now, fresh start is cleaner.
-                          // But if we want to support draft, we could set groupInputs first. 
-                          // Let's keep it simple and just open modal.
-                          setShowAddTrainingItemModal(true);
-                        }}
-                        className="w-full py-3 bg-slate-50 text-slate-600 rounded-lg hover:bg-slate-100 border border-slate-200 border-dashed flex items-center justify-center gap-2 font-medium transition-colors"
-                      >
-                        <Plus size={18} />
-                        Yeni Madde Ekle
-                      </button>
-                    </div>
-                  </div>
                 </div>
               );
             })}
@@ -1618,9 +1417,216 @@ function App() {
         </div>
       )}
 
+      {/* Workout Group Detail Modal */}
+      {selectedWorkoutGroupId && (() => {
+        const group = trainingGroups.find(g => g.id === selectedWorkoutGroupId);
+        if (!group) return null;
+
+        const completedCount = group.items.filter(i => i.completed).length;
+        const totalCount = group.items.length;
+        const progress = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm"
+            onClick={() => setSelectedWorkoutGroupId(null)}>
+            <div
+              className="bg-slate-50 rounded-t-3xl sm:rounded-2xl w-full max-lg h-[90vh] sm:h-auto sm:max-h-[85vh] overflow-hidden flex flex-col shadow-2xl animate-in slide-in-from-bottom duration-300"
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div className="bg-white px-5 py-4 border-b border-slate-100 sticky top-0 z-10">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex-1">
+                    {editingGroupId === group.id ? (
+                      <input
+                        type="text"
+                        value={editingGroupTitle}
+                        onChange={(e) => setEditingGroupTitle(e.target.value)}
+                        onBlur={() => updateGroupTitle(group.id)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') updateGroupTitle(group.id);
+                          if (e.key === 'Escape') setEditingGroupId(null);
+                        }}
+                        autoFocus
+                        className="text-2xl font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 w-full"
+                      />
+                    ) : (
+                      <h2
+                        className="text-2xl font-bold text-slate-800 cursor-pointer flex items-center gap-2 group/title"
+                        onClick={() => {
+                          setEditingGroupId(group.id);
+                          setEditingGroupTitle(group.title);
+                        }}
+                      >
+                        {group.title}
+                        <Edit3 size={18} className="text-slate-300 group-hover/title:text-primary transition-colors" />
+                      </h2>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => setSelectedWorkoutGroupId(null)}
+                    className="p-2 bg-slate-100 text-slate-500 rounded-full hover:bg-slate-200 transition-colors"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-slate-500 font-medium">
+                    {completedCount} / {totalCount} tamamlandı
+                  </p>
+                  <div className="flex items-center gap-3">
+                    {completedCount > 0 && (
+                      <button
+                        onClick={() => resetGroupProgress(group.id)}
+                        className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-full hover:bg-slate-200"
+                      >
+                        İlerlemeyi Sıfırla
+                      </button>
+                    )}
+                    <button
+                      onClick={() => {
+                        if (window.confirm('Bu grubu silmek istediğinize emin misiniz?')) {
+                          deleteGroup(group.id);
+                          setSelectedWorkoutGroupId(null);
+                        }
+                      }}
+                      className="p-2 text-red-500 hover:bg-red-50 rounded-full transition-colors"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Progress Bar in Modal */}
+                {totalCount > 0 && (
+                  <div className="w-full bg-slate-100 rounded-full h-3">
+                    <div
+                      className="bg-green-500 h-3 rounded-full transition-all duration-500 shadow-sm"
+                      style={{ width: `${progress}%` }}
+                    ></div>
+                  </div>
+                )}
+              </div>
+
+              {/* Modal Body */}
+              <div className="flex-1 overflow-y-auto p-5 pb-24 space-y-4">
+                {/* Active Items */}
+                <div className="space-y-3">
+                  {group.items.filter(i => !i.completed).map((item, index) => {
+                    const isEditing = editingItem?.itemId === item.id;
+
+                    if (isEditing) {
+                      return (
+                        <div key={item.id} className="p-4 rounded-xl border-2 border-primary bg-white shadow-md space-y-4">
+                          <input
+                            type="text"
+                            value={editingItem.text}
+                            onChange={(e) => setEditingItem(prev => ({ ...prev, text: e.target.value }))}
+                            className="w-full p-3 border border-slate-200 rounded-xl text-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                            autoFocus
+                          />
+                          <div className="flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-2">
+                              {['text-slate-800', 'text-red-600', 'text-blue-600', 'text-green-600', 'text-purple-600'].map((colorClass) => {
+                                const bgClass = colorClass.replace('text-', 'bg-');
+                                return (
+                                  <button
+                                    key={colorClass}
+                                    onClick={() => setEditingItem(prev => ({ ...prev, color: colorClass }))}
+                                    className={`w-7 h-7 rounded-full ${bgClass} ${editingItem.color === colorClass ? 'ring-2 ring-offset-2 ring-primary' : ''}`}
+                                  />
+                                );
+                              })}
+                              <button
+                                onClick={() => setEditingItem(prev => ({ ...prev, isBold: !prev.isBold }))}
+                                className={`p-2 rounded-lg ${editingItem.isBold ? 'bg-slate-200 text-slate-800' : 'text-slate-400 hover:bg-slate-100'}`}
+                              >
+                                <Bold size={20} />
+                              </button>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button onClick={() => setEditingItem(null)} className="px-4 py-2 text-slate-500 font-bold">İptal</button>
+                              <button onClick={handleSaveItem} className="px-4 py-2 bg-primary text-white rounded-xl font-bold flex items-center gap-1">
+                                <Save size={18} /> Kaydet
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div key={item.id} className="group p-4 rounded-xl border bg-white border-slate-200 flex flex-col gap-3 shadow-sm hover:shadow-md transition-all">
+                        <div className="flex items-start gap-4">
+                          <div
+                            onClick={() => toggleTrainingItem(group.id, item.id)}
+                            className="mt-1 w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center border-2 border-slate-300 cursor-pointer hover:border-primary transition-colors hover:bg-primary/5"
+                          >
+                          </div>
+                          <span
+                            onClick={() => toggleTrainingItem(group.id, item.id)}
+                            className={`flex-1 text-lg cursor-pointer leading-tight ${item.color || 'text-slate-800'} ${item.isBold ? 'font-bold' : 'font-medium'}`}
+                          >
+                            {item.text}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-end gap-3 opacity-0 group-hover:opacity-100 transition-opacity pt-2 border-t border-slate-50">
+                          <button onClick={() => moveItem(group.id, index, -1)} disabled={index === 0} className="p-1.5 text-slate-400 hover:text-slate-700 disabled:opacity-20"><ArrowUp size={18} /></button>
+                          <button onClick={() => moveItem(group.id, index, 1)} disabled={index === group.items.filter(i => !i.completed).length - 1} className="p-1.5 text-slate-400 hover:text-slate-700 disabled:opacity-20"><ArrowDown size={18} /></button>
+                          <button onClick={() => setEditingItem({ groupId: group.id, itemId: item.id, text: item.text, color: item.color || 'text-slate-800', isBold: item.isBold || false })} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg"><Edit3 size={18} /></button>
+                          <button onClick={() => removeTrainingItem(group.id, item.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 size={18} /></button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Completed Items */}
+                {group.items.some(i => i.completed) && (
+                  <div className="space-y-2 mt-6">
+                    <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider px-2">Tamamlananlar</h3>
+                    {group.items.filter(i => i.completed).map(item => (
+                      <div
+                        key={item.id}
+                        onClick={() => toggleTrainingItem(group.id, item.id)}
+                        className="p-4 rounded-xl border bg-slate-100 border-slate-200 flex items-center gap-4 cursor-pointer opacity-70 group"
+                      >
+                        <div className="w-7 h-7 rounded-full flex items-center justify-center bg-green-500 text-white">
+                          <CheckCircle size={18} />
+                        </div>
+                        <span className="flex-1 font-medium text-lg text-slate-500 line-through">
+                          {item.text}
+                        </span>
+                        <button onClick={(e) => { e.stopPropagation(); removeTrainingItem(group.id, item.id); }} className="p-2 text-slate-400 hover:text-red-500">
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Floating Footer in Modal */}
+              <div className="p-5 bg-white border-t border-slate-100 sticky bottom-0 z-10">
+                <button
+                  onClick={() => {
+                    setActiveGroupForModal(group.id);
+                    setShowAddTrainingItemModal(true);
+                  }}
+                  className="w-full py-4 bg-primary text-white rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg hover:bg-sky-600 transition-transform active:scale-95"
+                >
+                  <Plus size={24} /> Yeni Madde Ekle
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Add Training Item Modal */}
       {showAddTrainingItemModal && activeGroupForModal && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-0 sm:p-4 bg-black/50"
+        <div className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center p-0 sm:p-4 bg-black/50"
           onClick={() => setShowAddTrainingItemModal(false)}>
           <div
             className="bg-white rounded-t-2xl sm:rounded-2xl w-full max-w-sm p-5 space-y-4 shadow-xl animate-in slide-in-from-bottom duration-300"
