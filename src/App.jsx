@@ -678,6 +678,14 @@ function App() {
     }
   };
 
+  const handleFactoryReset = () => {
+    if (window.confirm('DİKKAT: Tüm kişisel verileriniz (notlar, eklenen görevler, antrenman geçmişi ve yüklenen listeler) SİLİNECEK. Uygulama ilk haline dönecek. Emin misiniz?')) {
+      localStorage.clear();
+      window.location.reload();
+    }
+  };
+
+
 
 
   // Export full month schedule (JSON + manual - hidden) to ICS
