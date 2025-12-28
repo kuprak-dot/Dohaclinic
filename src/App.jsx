@@ -678,12 +678,7 @@ function App() {
     }
   };
 
-  const handleAddToCalendar = () => {
-    if (!parsedEvents) return;
-    const icsContent = generateICS(parsedEvents);
-    const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
-    saveAs(blob, 'doha_clinic_schedule.ics');
-  };
+
 
   // Export full month schedule (JSON + manual - hidden) to ICS
   const exportFullScheduleToICS = () => {
@@ -1405,15 +1400,7 @@ function App() {
                       {processStatus}
                     </p>
 
-                    {parsedEvents && parsedEvents.length > 0 && (
-                      <button
-                        onClick={handleAddToCalendar}
-                        className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-800 transition-colors"
-                      >
-                        <Calendar size={20} />
-                        iPhone Takvimine Ekle
-                      </button>
-                    )}
+
                   </div>
                 )}
               </div>
