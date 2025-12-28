@@ -468,36 +468,34 @@ function App() {
   const getUpcomingSchedule = () => {
     const today = new Date();
     const dayOfMonth = today.getDate();
-    const currentMonth = today.getMonth();
+    const currentMonth = today.getMonth(); // 0-indexed
     const currentYear = today.getFullYear();
 
+    // Check if we have explicit metadata from the parsed file (e.g. "January List")
+    const metaDiffers = scheduleData?.metadata?.month !== undefined && scheduleData.metadata.month !== null;
+    let targetMonth = metaDiffers ? scheduleData.metadata.month : currentMonth;
+    let targetYear = (metaDiffers && scheduleData.metadata.year) ? scheduleData.metadata.year : currentYear;
+
     // Helper to determine if a day belongs to next month
-    // If today is late in month (e.g. >20) and target day is early (e.g. <15), assume next month
+    // Only used if NO metadata is present (legacy fallback)
     const isNextMonth = (d) => {
-      // If we are showing full month, we don't really care about "upcoming" logic as much for filtering,
-      // but we do for sorting. 
-      // For "Upcoming":
+      if (metaDiffers) return false; // If we know the month, we don't guess next month
       if (dayOfMonth > 20 && d < 15) return true;
       return false;
     };
 
     // Calculate a comparable timestamp for sorting
     const getSortableDate = (d) => {
-      let targetMonth = currentMonth;
-      let targetYear = currentYear;
+      let m = targetMonth;
+      let y = targetYear;
 
-      if (isNextMonth(d)) {
-        targetMonth++;
-        if (targetMonth > 11) {
-          targetMonth = 0;
-          targetYear++;
-        }
-      } else if (d < dayOfMonth && !showFullMonth) {
-        // Past day, shouldn't occur in filtered list, but just in case
-        // If showing full month, past days are just current month past days
+      // Legacy rollover logic if no metadata
+      if (!metaDiffers && isNextMonth(d)) {
+        m++;
+        if (m > 11) { m = 0; y++; }
       }
 
-      return new Date(targetYear, targetMonth, d).getTime();
+      return new Date(y, m, d).getTime();
     };
 
     // Create a map of all days with assignments
@@ -508,9 +506,24 @@ function App() {
       scheduleData.schedule
         .filter(d => {
           if (showFullMonth) return true;
-          // Show if:
-          // 1. Strictly greater than today (future this month)
-          // 2. OR detected as next month
+
+          if (metaDiffers) {
+            // If we have explicit metadata (e.g. January), we show all days that are >= today
+            // BUT "today" check needs to compare full dates.
+            // Reset checkDate time to 00:00 for fair comparison? 
+            // Actually, simplest is: if target month > current month, show all.
+            // If target month == current month, show if day > current day.
+            // If target month < current month, it's past, don't show (unless full month).
+
+            if (targetYear > currentYear) return true;
+            if (targetYear === currentYear) {
+              if (targetMonth > currentMonth) return true;
+              if (targetMonth === currentMonth) return d.day > dayOfMonth;
+            }
+            return false;
+          }
+
+          // Fallback logic
           return d.day > dayOfMonth || isNextMonth(d.day);
         })
         .forEach(d => {
@@ -521,7 +534,9 @@ function App() {
           if (filteredAssignments.length > 0) {
             dayMap.set(d.day, {
               day: d.day,
-              isNextMonth: isNextMonth(d.day), // Flag for rendering
+              isNextMonth: !metaDiffers && isNextMonth(d.day), // Flag for rendering
+              monthOverride: metaDiffers ? targetMonth : null,
+              yearOverride: metaDiffers ? targetYear : null,
               dayName: d.dayName || '',
               assignments: filteredAssignments
             });
@@ -533,6 +548,10 @@ function App() {
     manualDuties
       .filter(d => {
         if (showFullMonth) return true;
+        // Same logic as above for manual duties? 
+        // Manual duties are simplistic, usually just "day".
+        // If we are in "January View" because of upload, manual duties should probably align or be filtered out if they are local?
+        // Let's keep specific manual duty month agnostic for now or assume current/next month logic.
         return d.day > dayOfMonth || isNextMonth(d.day);
       })
       .forEach(duty => {
@@ -611,7 +630,11 @@ function App() {
     setParsedEvents(null);
 
     try {
-      const schedule = await parseScheduleFile(file, "Tevfik");
+      const result = await parseScheduleFile(file, "Tevfik");
+      // Result is now { schedule, metadata }
+      const schedule = result.schedule || result; // Handle legacy array if parser fails update
+      const metadata = result.metadata || {};
+
       setParsedEvents(schedule);
 
       const newData = {
@@ -619,7 +642,8 @@ function App() {
         sourceFile: file.name,
         fileLink: '#',
         fileId: 'local-upload',
-        schedule: schedule
+        schedule: schedule,
+        metadata: metadata // Save metadata
       };
 
       // Update main schedule view instantly
@@ -628,7 +652,13 @@ function App() {
       // SAVE TO LOCAL STORAGE
       localStorage.setItem('localSchedule', JSON.stringify(newData));
 
-      setProcessStatus(`Başarılı! ${schedule.length} gün bulundu. Program sekmesi güncellendi ve kaydedildi.`);
+      let msg = `Başarılı! ${schedule.length} gün bulundu.`;
+      if (metadata.month !== null) {
+        // Convert month index to name for display
+        const mName = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'][metadata.month];
+        msg += ` (${mName} ${metadata.year || ''} tespit edildi)`;
+      }
+      setProcessStatus(msg + ' Program sekmesi güncellendi ve kaydedildi.');
     } catch (error) {
       console.error(error);
       setProcessStatus('Hata: ' + error.message);
@@ -907,10 +937,11 @@ function App() {
                       const placeholder = getNotePlaceholder(day.assignments);
                       // Calculate day name
                       const today = new Date();
-                      let targetYear = today.getFullYear();
-                      let targetMonth = today.getMonth();
+                      let targetYear = day.yearOverride || today.getFullYear();
+                      let targetMonth = day.monthOverride !== null && day.monthOverride !== undefined ? day.monthOverride : today.getMonth();
 
-                      if (day.isNextMonth) {
+                      // Legacy logic if no override
+                      if (day.monthOverride === null && day.isNextMonth) {
                         targetMonth++;
                         if (targetMonth > 11) {
                           targetMonth = 0;

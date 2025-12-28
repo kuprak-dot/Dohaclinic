@@ -129,6 +129,44 @@ export const parseScheduleText = (text, targetName) => {
         'sunday': 6, 'pazar': 6
     };
 
+    // Detect Month and Year
+    let detectedMonth = null;
+    let detectedYear = null;
+
+    const months = [
+        { name: 'ocak', aliases: ['ocak', 'january', 'jan'], index: 0 },
+        { name: 'subat', aliases: ['subat', 'şubat', 'february', 'feb'], index: 1 },
+        { name: 'mart', aliases: ['mart', 'march', 'mar'], index: 2 },
+        { name: 'nisan', aliases: ['nisan', 'april', 'apr'], index: 3 },
+        { name: 'mayis', aliases: ['mayis', 'mayıs', 'may'], index: 4 },
+        { name: 'haziran', aliases: ['haziran', 'june', 'jun'], index: 5 },
+        { name: 'temmuz', aliases: ['temmuz', 'july', 'jul'], index: 6 },
+        { name: 'agustos', aliases: ['agustos', 'ağustos', 'august', 'aug'], index: 7 },
+        { name: 'eylul', aliases: ['eylul', 'eylül', 'september', 'sep'], index: 8 },
+        { name: 'ekim', aliases: ['ekim', 'october', 'oct'], index: 9 },
+        { name: 'kasim', aliases: ['kasim', 'kasım', 'november', 'nov'], index: 10 },
+        { name: 'aralik', aliases: ['aralik', 'aralık', 'december', 'dec'], index: 11 }
+    ];
+
+    // Scan first 20 lines for month/year (headers usually)
+    const headerText = rawLines.slice(0, 20).join(' ').toLowerCase();
+
+    // Year
+    const yearMatch = headerText.match(/202[4-9]/);
+    if (yearMatch) {
+        detectedYear = parseInt(yearMatch[0]);
+    }
+
+    // Month
+    for (const m of months) {
+        if (m.aliases.some(alias => headerText.includes(alias))) {
+            detectedMonth = m.index;
+            break;
+        }
+    }
+
+    console.log(`Detected Date: Month=${detectedMonth}, Year=${detectedYear}`);
+
     // Step 1: Parse ALL lines and identify data rows
     const parsedLines = [];
     let currentFoundDate = null; // Track date to help inference
@@ -260,7 +298,13 @@ export const parseScheduleText = (text, targetName) => {
         }
     });
 
-    return schedule;
+    return {
+        schedule,
+        metadata: {
+            month: detectedMonth,
+            year: detectedYear
+        }
+    };
 };
 
 export const generateICS = (scheduleEvents) => {
