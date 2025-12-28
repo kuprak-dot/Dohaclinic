@@ -10,6 +10,7 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [weather, setWeather] = useState(null);
   const [showAllUpcoming, setShowAllUpcoming] = useState(false);
+  const [showFullMonth, setShowFullMonth] = useState(false);
   const [notes, setNotes] = useState(() => {
     const saved = localStorage.getItem('dailyNotes');
     return saved ? JSON.parse(saved) : {};
@@ -46,7 +47,7 @@ function App() {
 
   useEffect(() => {
     // Fetch schedule data
-    fetch('/schedule.json')
+    fetch(`/schedule.json?t=${Date.now()}`)
       .then(res => res.json())
       .then(data => {
         setScheduleData(data);
@@ -455,7 +456,7 @@ function App() {
     // Add schedule.json data (filter hidden ones)
     if (scheduleData?.schedule) {
       scheduleData.schedule
-        .filter(d => d.day > dayOfMonth)
+        .filter(d => showFullMonth || d.day > dayOfMonth)
         .forEach(d => {
           const filteredAssignments = d.assignments
             .filter(a => !isDutyHidden(d.day, a.location))
@@ -473,7 +474,7 @@ function App() {
 
     // Merge manual duties
     manualDuties
-      .filter(d => d.day > dayOfMonth)
+      .filter(d => showFullMonth || d.day > dayOfMonth)
       .forEach(duty => {
         if (dayMap.has(duty.day)) {
           dayMap.get(duty.day).assignments.push({
@@ -502,7 +503,7 @@ function App() {
 
   const todayAssignments = getTodaySchedule();
   const allUpcomingDays = getUpcomingSchedule();
-  const upcomingDays = showAllUpcoming ? allUpcomingDays : allUpcomingDays.slice(0, 4);
+  const upcomingDays = showAllUpcoming || showFullMonth ? allUpcomingDays : allUpcomingDays.slice(0, 4);
   const currentDay = new Date().getDate();
 
   // Spanish Word of the Day Logic
@@ -780,8 +781,17 @@ function App() {
             {/* Upcoming Schedule */}
             <div>
               <div className="flex items-center justify-between mb-2 px-1">
-                <h3 className="font-bold text-slate-700 text-lg">Yaklaşan Görevler</h3>
+                <h3 className="font-bold text-slate-700 text-lg">
+                  {showFullMonth ? 'Tüm Ay Programı' : 'Yaklaşan Görevler'}
+                </h3>
                 <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setShowFullMonth(!showFullMonth)}
+                    className={`px-3 h-8 rounded-full text-sm font-medium transition-colors shadow-sm flex items-center gap-1 ${showFullMonth ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600 border border-slate-200'}`}
+                  >
+                    <Calendar size={14} />
+                    {showFullMonth ? 'Kısalt' : 'Tümünü Gör'}
+                  </button>
                   <button
                     onClick={exportFullScheduleToICS}
                     className="w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center hover:bg-green-600 transition-colors shadow-sm"

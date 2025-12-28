@@ -79,7 +79,7 @@ async function getDriveClient() {
     return google.drive({ version: 'v3', auth });
 }
 
-// Find the latest file (PDF only) in the target folder
+// Find the latest file (PDF, Image, or Google Sheet) in the target folder
 async function getLatestFile(drive) {
     try {
         // 1. Find the folder
@@ -96,9 +96,9 @@ async function getLatestFile(drive) {
         const folderId = folderRes.data.files[0].id;
         console.log(`Found folder '${FOLDER_NAME}' (ID: ${folderId})`);
 
-        // 2. Search for PDF and Image files
+        // 2. Search for PDF, Image files, and Google Sheets
         const filesRes = await drive.files.list({
-            q: `'${folderId}' in parents and (mimeType = 'application/pdf' or mimeType = 'image/jpeg' or mimeType = 'image/png') and trashed = false`,
+            q: `'${folderId}' in parents and (mimeType = 'application/pdf' or mimeType = 'image/jpeg' or mimeType = 'image/png' or mimeType = 'application/vnd.google-apps.spreadsheet') and trashed = false`,
             orderBy: 'createdTime desc',
             pageSize: 1,
             fields: 'files(id, name, mimeType, webContentLink, webViewLink, createdTime)',
@@ -110,7 +110,7 @@ async function getLatestFile(drive) {
             return file;
         }
 
-        console.log("No schedule files (PDF/JPG/PNG) found in the folder.");
+        console.log("No schedule files (PDF/JPG/PNG/Sheet) found in the folder.");
         return null;
 
     } catch (error) {
@@ -119,13 +119,23 @@ async function getLatestFile(drive) {
     }
 }
 
-// Download file
-async function downloadFile(drive, fileId, destPath) {
+// Download file (handles standard download and Google Sheet export)
+async function downloadFile(drive, fileId, destPath, mimeType) {
     const dest = fs.createWriteStream(destPath);
-    const res = await drive.files.get(
-        { fileId, alt: 'media' },
-        { responseType: 'stream' }
-    );
+    let res;
+
+    if (mimeType === 'application/vnd.google-apps.spreadsheet') {
+        console.log('Exporting Google Sheet as PDF...');
+        res = await drive.files.export(
+            { fileId, mimeType: 'application/pdf' },
+            { responseType: 'stream' }
+        );
+    } else {
+        res = await drive.files.get(
+            { fileId, alt: 'media' },
+            { responseType: 'stream' }
+        );
+    }
 
     return new Promise((resolve, reject) => {
         res.data
@@ -141,6 +151,7 @@ async function downloadFile(drive, fileId, destPath) {
     });
 }
 
+// ... (extractText functions remain the same) ...
 // Extract text from Image using Tesseract
 async function extractTextFromImage(imgPath) {
     console.log("Starting OCR...");
@@ -222,6 +233,7 @@ async function extractTextFromPDF(pdfPath) {
     return fullText;
 }
 
+// ... (parseSchedule remains the same) ...
 // Parse Schedule
 function parseSchedule(text) {
     console.log("--- Extracted Text Preview ---");
@@ -504,12 +516,13 @@ async function main() {
         return;
     }
 
-    const isPDF = file.mimeType === 'application/pdf';
+    const isGoogleSheet = file.mimeType === 'application/vnd.google-apps.spreadsheet';
+    const isPDF = file.mimeType === 'application/pdf' || isGoogleSheet;
     const ext = isPDF ? '.pdf' : (file.mimeType === 'image/png' ? '.png' : '.jpg');
     const localPath = (isPDF ? path.join(__dirname, 'temp_schedule') : TEMP_IMG_PATH) + ext;
 
     console.log(`Downloading ${file.name}...`);
-    await downloadFile(drive, file.id, localPath);
+    await downloadFile(drive, file.id, localPath, file.mimeType);
 
     let ocrPath = localPath;
     let processedPath = null;
@@ -521,6 +534,7 @@ async function main() {
         if (success) {
             ocrPath = processedPath;
         }
+
     }
 
     console.log(`Extracting text from ${isPDF ? 'PDF' : 'image'}...`);
