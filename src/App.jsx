@@ -1457,21 +1457,21 @@ function App() {
                     Varsayılan Listeye Dön
                   </button>
                 )}
-
-                <div className="pt-8 mt-4 border-t border-slate-100">
-                  <button
-                    onClick={handleFactoryReset}
-                    className="flex items-center justify-center space-x-2 w-full px-4 py-3 text-red-600 border border-red-200 bg-red-50 hover:bg-red-100 rounded-xl text-sm font-bold transition-colors"
-                  >
-                    <span>⚠️</span>
-                    <span>Uygulamayı Tamamen Sıfırla (Önbellek Temizle)</span>
-                  </button>
-                  <p className="mt-2 text-xs text-slate-400 px-4">
-                    Eğer notlarınız veya listeniz karıştıysa bu butonu kullanarak tüm verileri silebilirsiniz.
-                  </p>
-                </div>
               </div>
             )}
+
+            <div className="pt-8 mt-8 border-t border-slate-100 w-full">
+              <button
+                onClick={handleFactoryReset}
+                className="flex items-center justify-center space-x-2 w-full px-4 py-3 text-red-600 border border-red-200 bg-red-50 hover:bg-red-100 rounded-xl text-sm font-bold transition-colors"
+              >
+                <span>⚠️</span>
+                <span>Uygulamayı Tamamen Sıfırla (Önbellek Temizle)</span>
+              </button>
+              <p className="mt-2 text-xs text-slate-400 px-4 text-center">
+                Eğer notlarınız veya listeniz karıştıysa bu butonu kullanarak tüm verileri silebilirsiniz.
+              </p>
+            </div>
           </div>
         )}
       </main>
