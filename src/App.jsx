@@ -286,7 +286,35 @@ function App() {
 
   // Quick Note Tags
   const [activeNoteModalDay, setActiveNoteModalDay] = useState(null);
-  const noteTags = ["Koşu Antrenman", "Üst Vct", "Total -Core", "Alt Vct"];
+  const noteTags = [
+    "Easy Run + Core",
+    "Strength (Lower body + Push)",
+    "Quality Run + Short Core",
+    "Optional Walk (Active Recovery)",
+    "Mobility Flow (25–30 min)",
+    "Strength (Pull + Posterior Chain)",
+    "Optional Session"
+  ];
+
+  // State for editing group titles
+  const [editingGroupId, setEditingGroupId] = useState(null);
+  const [editingGroupTitle, setEditingGroupTitle] = useState('');
+
+  // Function to update group title
+  const updateGroupTitle = (groupId) => {
+    if (!editingGroupTitle.trim()) {
+      setEditingGroupId(null);
+      return;
+    }
+    setTrainingGroups(prev => prev.map(group => {
+      if (group.id === groupId) {
+        return { ...group, title: editingGroupTitle.trim() };
+      }
+      return group;
+    }));
+    setEditingGroupId(null);
+    setEditingGroupTitle('');
+  };
 
   const handleAddTag = (tag) => {
     if (!activeNoteModalDay) return;
@@ -905,7 +933,31 @@ function App() {
                 <div key={group.id} className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
                   <div className="flex items-center justify-between mb-4">
                     <div>
-                      <h2 className="text-xl font-bold text-slate-800">{group.title}</h2>
+                      {editingGroupId === group.id ? (
+                        <input
+                          type="text"
+                          value={editingGroupTitle}
+                          onChange={(e) => setEditingGroupTitle(e.target.value)}
+                          onBlur={() => updateGroupTitle(group.id)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') updateGroupTitle(group.id);
+                            if (e.key === 'Escape') setEditingGroupId(null);
+                          }}
+                          autoFocus
+                          className="text-xl font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 focus:ring-2 focus:ring-primary focus:border-primary"
+                        />
+                      ) : (
+                        <h2
+                          className="text-xl font-bold text-slate-800 cursor-pointer hover:text-primary transition-colors"
+                          onClick={() => {
+                            setEditingGroupId(group.id);
+                            setEditingGroupTitle(group.title);
+                          }}
+                          title="Tıklayarak adı düzenle"
+                        >
+                          {group.title} <Edit3 size={14} className="inline-block ml-1 text-slate-400" />
+                        </h2>
+                      )}
                       <p className="text-slate-500 text-sm">
                         {completedCount}/{totalCount} tamamlandı
                       </p>
@@ -1246,12 +1298,12 @@ function App() {
               </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
+            <div className="flex flex-col gap-2">
               {noteTags.map((tag) => (
                 <button
                   key={tag}
                   onClick={() => handleAddTag(tag)}
-                  className="p-3 text-sm font-medium text-slate-700 bg-slate-50 hover:bg-primary hover:text-white rounded-xl border border-slate-200 transition-colors"
+                  className="p-3 text-sm font-medium text-slate-700 bg-slate-50 hover:bg-primary hover:text-white rounded-xl border border-slate-200 transition-colors text-left"
                 >
                   {tag}
                 </button>
