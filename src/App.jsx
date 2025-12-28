@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, FileText, Bell, Clock, MapPin, Sun, Edit3, ChevronDown, ChevronUp, Plus, X, Download, Newspaper, ExternalLink, TrendingUp, Activity, CheckCircle, Trash2, Tag } from 'lucide-react';
+import { Calendar, FileText, Bell, Clock, MapPin, Sun, Edit3, ChevronDown, ChevronUp, Plus, X, Download, Newspaper, ExternalLink, TrendingUp, Activity, CheckCircle, Trash2, Tag, ArrowUp, ArrowDown, Save, Palette, Bold } from 'lucide-react';
 import { spanishWords } from './spanishWords';
 import { parseScheduleFile, generateICS } from './utils/parser';
 import { saveAs } from 'file-saver';
@@ -228,6 +228,48 @@ function App() {
 
   const handleGroupInputChange = (groupId, value) => {
     setGroupInputs(prev => ({ ...prev, [groupId]: value }));
+  };
+
+  // Advanced Item Management
+  const [editingItem, setEditingItem] = useState(null); // { groupId, itemId, text, color, isBold }
+
+  const updateItem = (groupId, itemId, updates) => {
+    setTrainingGroups(prev => prev.map(group => {
+      if (group.id === groupId) {
+        return {
+          ...group,
+          items: group.items.map(item =>
+            item.id === itemId ? { ...item, ...updates } : item
+          )
+        };
+      }
+      return group;
+    }));
+  };
+
+  const moveItem = (groupId, index, direction) => {
+    setTrainingGroups(prev => prev.map(group => {
+      if (group.id === groupId) {
+        const newItems = [...group.items];
+        if (direction === -1 && index > 0) {
+          [newItems[index], newItems[index - 1]] = [newItems[index - 1], newItems[index]];
+        } else if (direction === 1 && index < newItems.length - 1) {
+          [newItems[index], newItems[index + 1]] = [newItems[index + 1], newItems[index]];
+        }
+        return { ...group, items: newItems };
+      }
+      return group;
+    }));
+  };
+
+  const handleSaveItem = () => {
+    if (!editingItem) return;
+    updateItem(editingItem.groupId, editingItem.itemId, {
+      text: editingItem.text,
+      color: editingItem.color,
+      isBold: editingItem.isBold
+    });
+    setEditingItem(null);
   };
 
   const toggleTrainingItem = (groupId, itemId) => {
@@ -993,28 +1035,123 @@ function App() {
                   <div className="space-y-4">
                     {/* Active Items */}
                     <div className="space-y-2">
-                      {group.items.filter(i => !i.completed).map(item => (
-                        <div
-                          key={item.id}
-                          onClick={() => toggleTrainingItem(group.id, item.id)}
-                          className="p-3 rounded-lg border bg-white border-slate-200 hover:border-primary flex items-center gap-3 cursor-pointer transition-all"
-                        >
-                          <div className="w-6 h-6 rounded-full flex items-center justify-center border-2 border-slate-300 transition-colors">
-                          </div>
-                          <span className="flex-1 font-medium text-lg text-slate-800">
-                            {item.text}
-                          </span>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              removeTrainingItem(group.id, item.id);
-                            }}
-                            className="text-slate-300 hover:text-red-400 p-1"
+                      {group.items.filter(i => !i.completed).map((item, index) => {
+                        const isEditing = editingItem?.itemId === item.id;
+
+                        if (isEditing) {
+                          return (
+                            <div key={item.id} className="p-3 rounded-lg border border-primary bg-primary/5 space-y-3">
+                              <input
+                                type="text"
+                                value={editingItem.text}
+                                onChange={(e) => setEditingItem(prev => ({ ...prev, text: e.target.value }))}
+                                className="w-full p-2 border border-slate-300 rounded-lg text-lg"
+                                autoFocus
+                              />
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  {/* Colors */}
+                                  {[
+                                    { class: 'text-slate-800', bg: 'bg-slate-800' },
+                                    { class: 'text-red-600', bg: 'bg-red-600' },
+                                    { class: 'text-blue-600', bg: 'bg-blue-600' },
+                                    { class: 'text-green-600', bg: 'bg-green-600' },
+                                    { class: 'text-purple-600', bg: 'bg-purple-600' }
+                                  ].map((c) => (
+                                    <button
+                                      key={c.class}
+                                      onClick={() => setEditingItem(prev => ({ ...prev, color: c.class }))}
+                                      className={`w-6 h-6 rounded-full ${c.bg} ${editingItem.color === c.class ? 'ring-2 ring-offset-2 ring-primary' : ''}`}
+                                    />
+                                  ))}
+                                  <div className="w-px h-6 bg-slate-300 mx-1"></div>
+                                  <button
+                                    onClick={() => setEditingItem(prev => ({ ...prev, isBold: !prev.isBold }))}
+                                    className={`p-1.5 rounded-lg ${editingItem.isBold ? 'bg-slate-200 text-slate-800' : 'text-slate-400 hover:bg-slate-100'}`}
+                                  >
+                                    <Bold size={18} />
+                                  </button>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={() => setEditingItem(null)}
+                                    className="px-3 py-1.5 text-slate-500 hover:bg-slate-100 rounded-lg text-sm font-medium"
+                                  >
+                                    İptal
+                                  </button>
+                                  <button
+                                    onClick={handleSaveItem}
+                                    className="px-3 py-1.5 bg-primary text-white rounded-lg text-sm font-medium flex items-center gap-1"
+                                  >
+                                    <Save size={16} /> Kaydet
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <div
+                            key={item.id}
+                            className="group p-3 rounded-lg border bg-white border-slate-200 flex flex-col gap-2 transition-all hover:border-slate-300"
                           >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      ))}
+                            <div className="flex items-start gap-3">
+                              <div
+                                onClick={() => toggleTrainingItem(group.id, item.id)}
+                                className="mt-1 w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center border-2 border-slate-300 cursor-pointer hover:border-primary transition-colors"
+                              >
+                              </div>
+                              <span
+                                onClick={() => toggleTrainingItem(group.id, item.id)}
+                                className={`flex-1 text-lg cursor-pointer ${item.color || 'text-slate-800'} ${item.isBold ? 'font-bold' : 'font-medium'}`}
+                              >
+                                {item.text}
+                              </span>
+                            </div>
+
+                            {/* Controls Row - Visible slightly always, fully on group hover */}
+                            <div className="flex items-center justify-end gap-1 pt-2 border-t border-slate-50 mt-1 opacity-60 group-hover:opacity-100 transition-opacity">
+                              <button
+                                onClick={() => moveItem(group.id, index, -1)}
+                                disabled={index === 0}
+                                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded disabled:opacity-30"
+                              >
+                                <ArrowUp size={16} />
+                              </button>
+                              <button
+                                onClick={() => moveItem(group.id, index, 1)}
+                                disabled={index === group.items.filter(i => !i.completed).length - 1} // Logic slightly imperfect if mixed with completed, but okay for active list
+                                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded disabled:opacity-30"
+                              >
+                                <ArrowDown size={16} />
+                              </button>
+                              <div className="w-px h-4 bg-slate-200 mx-1"></div>
+                              <button
+                                onClick={() => setEditingItem({
+                                  groupId: group.id,
+                                  itemId: item.id,
+                                  text: item.text,
+                                  color: item.color || 'text-slate-800',
+                                  isBold: item.isBold || false
+                                })}
+                                className="p-1.5 text-blue-400 hover:text-blue-600 hover:bg-blue-50 rounded"
+                              >
+                                <Edit3 size={16} />
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  removeTrainingItem(group.id, item.id);
+                                }}
+                                className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
 
                     {/* Completed Items */}
