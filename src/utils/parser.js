@@ -271,12 +271,16 @@ export const parseScheduleText = (text, targetName) => {
 
                 // Effective index (skipping date columns)
                 let effectiveIndex = index;
-                if (item.explicitDate || (parts[0] && parseInt(parts[0]))) effectiveIndex -= 1;
-                if (parts[1] && days.some(d => parts[1].toLowerCase().includes(d))) effectiveIndex -= 1;
+                // If the first part is a number (date), or second part is a day name, adjust index
+                if (parts[0] && (parseInt(parts[0]) || days.some(d => parts[0].toLowerCase().includes(d)))) effectiveIndex -= 1;
+                if (parts[1] && (parseInt(parts[1]) || days.some(d => parts[1].toLowerCase().includes(d)))) effectiveIndex -= 1;
+
+                // Ensure effectiveIndex isn't negative
+                effectiveIndex = Math.max(0, effectiveIndex);
 
                 if (effectiveIndex === 0) { location = "Room 201"; time = "08:00 - 15:00"; }
                 else if (effectiveIndex === 1) { location = "Room 214"; time = "08:00 - 12:00"; }
-                else if (effectiveIndex === 2) { location = "Room 214"; time = "12:00 - 19:00"; }
+                else if (effectiveIndex === 2) { location = "Room 214 (Afternoon)"; time = "12:00 - 19:00"; }
                 else if (effectiveIndex === 3) { location = "On Call"; time = "24h"; }
                 else if (effectiveIndex === 4) { location = "Abu Sidra"; time = "13:00 - 21:00"; }
                 else {
@@ -311,16 +315,21 @@ export const generateICS = (scheduleEvents) => {
     let icsContent = "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//DohaClinic//Schedule//EN\n";
 
     scheduleEvents.forEach(daySchedule => {
-        daySchedule.assignments.forEach(event => {
-            // Calculate date
-            const today = new Date();
-            let eventDate = new Date(today.getFullYear(), today.getMonth(), daySchedule.day);
+        const today = new Date();
+        // Use provided year/month if available, otherwise fallback to guessing logic
+        let y = daySchedule.year !== undefined ? daySchedule.year : today.getFullYear();
+        let m = daySchedule.month !== undefined ? daySchedule.month : today.getMonth();
 
-            // If day has passed this month, assume next month
+        // Guessing logic fallback
+        if (daySchedule.year === undefined || daySchedule.month === undefined) {
             if (daySchedule.day < today.getDate() - 5) {
-                eventDate.setMonth(eventDate.getMonth() + 1);
+                m++;
+                if (m > 11) { m = 0; y++; }
             }
+        }
 
+        daySchedule.assignments.forEach(event => {
+            let eventDate = new Date(y, m, daySchedule.day);
             const dateString = eventDate.toISOString().replace(/[-:]/g, '').split('T')[0];
 
             // Time parsing

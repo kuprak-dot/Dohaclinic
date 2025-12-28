@@ -449,14 +449,26 @@ function App() {
   const getTodaySchedule = () => {
     const today = new Date();
     const dayOfMonth = today.getDate();
+    const currentMonth = today.getMonth(); // 0-indexed
+    const currentYear = today.getFullYear();
 
-    // Get from schedule.json and filter out hidden ones
-    const jsonData = scheduleData?.schedule?.find(d => d.day === dayOfMonth);
-    const jsonAssignments = (jsonData?.assignments || [])
-      .filter(a => !isDutyHidden(dayOfMonth, a.location))
-      .map(a => ({ ...a, isManual: false }));
+    // Determine the month/year context of the current scheduleData
+    const metaDiffers = scheduleData?.metadata?.month !== undefined && scheduleData.metadata.month !== null;
+    const targetMonth = metaDiffers ? scheduleData.metadata.month : currentMonth;
+    const targetYear = (metaDiffers && scheduleData.metadata.year) ? scheduleData.metadata.year : currentYear;
+
+    // Only get from JSON if the schedule's month/year matches today
+    const isSameMonth = targetMonth === currentMonth && targetYear === currentYear;
+
+    // Get from schedule.json and filter out hidden ones (only if it's the correct month)
+    const jsonAssignments = isSameMonth
+      ? (scheduleData?.schedule?.find(d => d.day === dayOfMonth)?.assignments || [])
+        .filter(a => !isDutyHidden(dayOfMonth, a.location))
+        .map(a => ({ ...a, isManual: false }))
+      : [];
 
     // Get manual duties for today
+    // Manual duties are currently simple day-based, let's assume they apply to the current real-world month
     const manualToday = manualDuties
       .filter(d => d.day === dayOfMonth)
       .map(d => ({ location: d.location, time: d.time, isManual: true }));
@@ -467,76 +479,55 @@ function App() {
   // Get upcoming assignments (next 7 days, EXCLUDING today) - merged with manual duties
   const getUpcomingSchedule = () => {
     const today = new Date();
-    const dayOfMonth = today.getDate();
+    today.setHours(0, 0, 0, 0); // Reset time for accurate date comparison
+
     const currentMonth = today.getMonth(); // 0-indexed
     const currentYear = today.getFullYear();
 
     // Check if we have explicit metadata from the parsed file (e.g. "January List")
     const metaDiffers = scheduleData?.metadata?.month !== undefined && scheduleData.metadata.month !== null;
     let targetMonth = metaDiffers ? scheduleData.metadata.month : currentMonth;
-    let targetYear = (metaDiffers && scheduleData.metadata.year) ? scheduleData.metadata.year : currentYear;
+    let targetYear = currentYear;
+    if (metaDiffers && scheduleData.metadata.year) targetYear = scheduleData.metadata.year;
 
-    // Helper to determine if a day belongs to next month
-    // Only used if NO metadata is present (legacy fallback)
-    const isNextMonth = (d) => {
-      if (metaDiffers) return false; // If we know the month, we don't guess next month
-      if (dayOfMonth > 20 && d < 15) return true;
-      return false;
-    };
-
-    // Calculate a comparable timestamp for sorting
-    const getSortableDate = (d) => {
-      let m = targetMonth;
-      let y = targetYear;
-
-      // Legacy rollover logic if no metadata
-      if (!metaDiffers && isNextMonth(d)) {
-        m++;
-        if (m > 11) { m = 0; y++; }
-      }
-
-      return new Date(y, m, d).getTime();
-    };
-
-    // Create a map of all days with assignments
+    // Create a map of all days with assignments, keyed by YYYY-MM-DD
     const dayMap = new Map();
 
     // Add schedule.json data
     if (scheduleData?.schedule) {
       scheduleData.schedule
-        .filter(d => {
-          if (showFullMonth) return true;
+        .forEach(d => {
+          // Determine the absolute date for this JSON entry
+          let m = targetMonth;
+          let y = targetYear;
 
-          if (metaDiffers) {
-            // If we have explicit metadata (e.g. January), we show all days that are >= today
-            // BUT "today" check needs to compare full dates.
-            // Reset checkDate time to 00:00 for fair comparison? 
-            // Actually, simplest is: if target month > current month, show all.
-            // If target month == current month, show if day > current day.
-            // If target month < current month, it's past, don't show (unless full month).
-
-            if (targetYear > currentYear) return true;
-            if (targetYear === currentYear) {
-              if (targetMonth > currentMonth) return true;
-              if (targetMonth === currentMonth) return d.day > dayOfMonth;
+          // Legacy rollover logic if no metadata: if day is small and we are late in month, it's next month
+          if (!metaDiffers) {
+            if (today.getDate() > 20 && d.day < 15) {
+              m++;
+              if (m > 11) { m = 0; y++; }
             }
-            return false;
           }
 
-          // Fallback logic
-          return d.day > dayOfMonth || isNextMonth(d.day);
-        })
-        .forEach(d => {
-          const filteredAssignments = d.assignments
+          const entryDate = new Date(y, m, d.day);
+          const dateKey = `${y}-${String(m + 1).padStart(2, '0')}-${String(d.day).padStart(2, '0')}`;
+
+          // Filter: only show if today or future (unless showFullMonth)
+          if (!showFullMonth && entryDate < today) return;
+          // If not full month, and we are in "Today view" mode, we usually exclude today from "Upcoming" 
+          // because it has its own section. But here we decide based on showFullMonth.
+          if (!showFullMonth && entryDate.getTime() === today.getTime()) return;
+
+          const filteredAssignments = (d.assignments || [])
             .filter(a => !isDutyHidden(d.day, a.location))
             .map(a => ({ ...a, isManual: false }));
 
           if (filteredAssignments.length > 0) {
-            dayMap.set(d.day, {
+            dayMap.set(dateKey, {
               day: d.day,
-              isNextMonth: !metaDiffers && isNextMonth(d.day), // Flag for rendering
-              monthOverride: metaDiffers ? targetMonth : null,
-              yearOverride: metaDiffers ? targetYear : null,
+              month: m,
+              year: y,
+              dateKey,
               dayName: d.dayName || '',
               assignments: filteredAssignments
             });
@@ -546,26 +537,36 @@ function App() {
 
     // Merge manual duties
     manualDuties
-      .filter(d => {
-        if (showFullMonth) return true;
-        // Same logic as above for manual duties? 
-        // Manual duties are simplistic, usually just "day".
-        // If we are in "January View" because of upload, manual duties should probably align or be filtered out if they are local?
-        // Let's keep specific manual duty month agnostic for now or assume current/next month logic.
-        return d.day > dayOfMonth || isNextMonth(d.day);
-      })
       .forEach(duty => {
-        const isNext = isNextMonth(duty.day);
-        if (dayMap.has(duty.day)) {
-          dayMap.get(duty.day).assignments.push({
+        // For manual duties, we need to decide which month they belong to.
+        // Usually they are for the "current" context.
+        let m = today.getMonth();
+        let y = today.getFullYear();
+
+        // If the day is much earlier than today, it might be next month.
+        if (duty.day < today.getDate() - 5) {
+          m++;
+          if (m > 11) { m = 0; y++; }
+        }
+
+        const entryDate = new Date(y, m, duty.day);
+        const dateKey = `${y}-${String(m + 1).padStart(2, '0')}-${String(duty.day).padStart(2, '0')}`;
+
+        if (!showFullMonth && entryDate < today) return;
+        if (!showFullMonth && entryDate.getTime() === today.getTime()) return;
+
+        if (dayMap.has(dateKey)) {
+          dayMap.get(dateKey).assignments.push({
             location: duty.location,
             time: duty.time,
             isManual: true
           });
         } else {
-          dayMap.set(duty.day, {
+          dayMap.set(dateKey, {
             day: duty.day,
-            isNextMonth: isNext,
+            month: m,
+            year: y,
+            dateKey,
             dayName: '',
             assignments: [{
               location: duty.location,
@@ -576,10 +577,11 @@ function App() {
         }
       });
 
-    // Convert to array and sort by calculated date
+    // Convert to array and sort by absolute date key
     return Array.from(dayMap.values())
-      .sort((a, b) => getSortableDate(a.day) - getSortableDate(b.day));
+      .sort((a, b) => a.dateKey.localeCompare(b.dateKey));
   };
+
 
   const todayAssignments = getTodaySchedule();
   const allUpcomingDays = getUpcomingSchedule();
@@ -690,54 +692,43 @@ function App() {
 
   // Export full month schedule (JSON + manual - hidden) to ICS
   const exportFullScheduleToICS = () => {
-    // Create a map of all days with assignments
-    const dayMap = new Map();
+    const upcoming = getUpcomingSchedule();
+    // If we want FULL month including today:
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
-    // Add schedule.json data (filter hidden ones)
-    if (scheduleData?.schedule) {
-      scheduleData.schedule.forEach(d => {
-        const filteredAssignments = d.assignments
-          .filter(a => !isDutyHidden(d.day, a.location));
+    // We can just call getUpcomingSchedule with a temporary override or just filter differently.
+    // Actually, getUpcomingSchedule filters out today. Let's get today's too.
+    const todayObj = todayAssignments.length > 0 ? {
+      day: today.getDate(),
+      month: today.getMonth(),
+      year: today.getFullYear(),
+      assignments: todayAssignments
+    } : null;
 
-        if (filteredAssignments.length > 0) {
-          dayMap.set(d.day, {
-            day: d.day,
-            assignments: filteredAssignments
-          });
-        }
-      });
-    }
+    let fullList = [...upcoming];
+    if (todayObj) fullList.push(todayObj);
 
-    // Merge manual duties
-    manualDuties.forEach(duty => {
-      if (dayMap.has(duty.day)) {
-        dayMap.get(duty.day).assignments.push({
-          location: duty.location,
-          time: duty.time
-        });
-      } else {
-        dayMap.set(duty.day, {
-          day: duty.day,
-          assignments: [{
-            location: duty.location,
-            time: duty.time
-          }]
-        });
-      }
+    // Sort again
+    fullList.sort((a, b) => {
+      const dateA = new Date(a.year, a.month, a.day);
+      const dateB = new Date(b.year, b.month, b.day);
+      return dateA - dateB;
     });
 
-    // Convert to array and sort
-    const fullSchedule = Array.from(dayMap.values()).sort((a, b) => a.day - b.day);
-
-    if (fullSchedule.length === 0) {
+    if (fullList.length === 0) {
       alert('Takvime eklenecek görev bulunamadı!');
       return;
     }
 
-    const icsContent = generateICS(fullSchedule);
+    const icsContent = generateICS(fullList);
     const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
-    saveAs(blob, 'aralik_2025_program.ics');
+
+    // Use detected month for filename
+    const mName = ['ocak', 'subat', 'mart', 'nisan', 'mayis', 'haziran', 'temmuz', 'agustos', 'eylul', 'ekim', 'kasim', 'aralik'][fullList[0].month];
+    saveAs(blob, `${mName}_${fullList[0].year}_program.ics`);
   };
+
 
   return (
     <div className="min-h-screen bg-slate-50 pb-24 font-sans text-base">
