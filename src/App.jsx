@@ -1488,23 +1488,41 @@ function App() {
             <div className="p-4 space-y-4">
               {/* Day Picker */}
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Tarih (Aralık 2025)</label>
-                <select
-                  value={newDuty.day}
-                  onChange={(e) => setNewDuty(prev => ({ ...prev, day: e.target.value }))}
-                  className="w-full p-3 border border-slate-200 rounded-xl text-lg font-medium focus:ring-2 focus:ring-primary focus:border-primary"
-                >
-                  <option value="">Gün seçin...</option>
-                  {Array.from({ length: 31 }, (_, i) => {
-                    const day = i + 1;
-                    const date = new Date(2026, 0, day); // January 2026
-                    const dayNames = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
-                    const dayName = dayNames[date.getDay()];
-                    return (
-                      <option key={day} value={day}>{day} Aralık ({dayName})</option>
-                    );
-                  })}
-                </select>
+                {(() => {
+                  const displayMonth = scheduleData?.metadata?.month !== undefined && scheduleData?.metadata?.month !== null
+                    ? scheduleData.metadata.month
+                    : (new Date().getDate() > 20 ? (new Date().getMonth() + 1) % 12 : new Date().getMonth());
+
+                  const displayYear = scheduleData?.metadata?.year || (displayMonth === 0 && new Date().getMonth() === 11 ? new Date().getFullYear() + 1 : new Date().getFullYear());
+                  const monthNames = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+                  const monthName = monthNames[displayMonth];
+
+                  return (
+                    <>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Tarih ({monthName} {displayYear})</label>
+                      <select
+                        value={newDuty.day}
+                        onChange={(e) => setNewDuty(prev => ({ ...prev, day: e.target.value }))}
+                        className="w-full p-3 border border-slate-200 rounded-xl text-lg font-medium focus:ring-2 focus:ring-primary focus:border-primary"
+                      >
+                        <option value="">Gün seçin...</option>
+                        {Array.from({ length: 31 }, (_, i) => {
+                          const day = i + 1;
+                          const date = new Date(displayYear, displayMonth, day);
+                          const dayNamesShort = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
+                          const dayNameShort = dayNamesShort[date.getDay()];
+
+                          // Basic check for valid date (e.g. Feb 30)
+                          if (date.getMonth() !== displayMonth) return null;
+
+                          return (
+                            <option key={day} value={day}>{day} {monthName} ({dayNameShort})</option>
+                          );
+                        })}
+                      </select>
+                    </>
+                  );
+                })()}
               </div>
 
               {/* Location Picker */}

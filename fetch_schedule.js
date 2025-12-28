@@ -283,8 +283,8 @@ function parseSchedule(text) {
         { name: 'aralik', aliases: ['aralik', 'aralık', 'december', 'dec'], index: 11 }
     ];
 
-    // Scan first 20 lines for month/year (headers usually)
-    const headerText = rawLines.slice(0, 20).join(' ').toLowerCase();
+    // Scan more lines for month/year
+    const headerText = rawLines.slice(0, 50).join(' ').toLowerCase();
 
     // Year
     const yearMatch = headerText.match(/202[4-9]/);
@@ -300,13 +300,25 @@ function parseSchedule(text) {
         }
     }
 
+    // Special case: if we see 01.01.2026, we can infer January
+    if (headerText.includes('01.01.')) detectedMonth = 0;
+    if (headerText.includes('01.12.')) detectedMonth = 11;
+
     console.log(`Detected Date: Month=${detectedMonth}, Year=${detectedYear}`);
 
     // Step 1: Parse ALL lines and identify data rows
     const parsedLines = [];
 
-    for (let i = 0; i < rawLines.length; i++) {
-        const line = rawLines[i];
+    // If text has NO pipes but has "Dr. Tevfik", it might be one long line from PDF extraction
+    // Let's try to split it by dates or keywords if it's too long
+    let linesToProcess = rawLines;
+    if (rawLines.length < 5 && text.includes('202') && text.length > 500) {
+        console.log("Detected long unformatted text - attempting to split by date...");
+        linesToProcess = text.split(/(\d{2}\.\d{2}\.202\d)/g);
+    }
+
+    for (let i = 0; i < linesToProcess.length; i++) {
+        const line = linesToProcess[i];
         let explicitDate = null;
         let dayNameIndex = null;
 
@@ -320,32 +332,45 @@ function parseSchedule(text) {
         }
 
         // Check for explicit date
-        // Pattern 1: Date with pipe "(8 |" or "8 |" or "8) |"
-        // Improved regex to handle closing parenthesis
-        let dateMatch = line.match(/^\(?\s*([0-9il]+)\)?\s*[|]/);
+        // Pattern 1: Full date 01.01.2026
+        const fullDateMatch = line.match(/(\d{2})\.(\d{2})\.(202\d)/);
+        if (fullDateMatch) {
+            explicitDate = parseInt(fullDateMatch[1]);
+            if (!detectedMonth) detectedMonth = parseInt(fullDateMatch[2]) - 1;
+            if (!detectedYear) detectedYear = parseInt(fullDateMatch[3]);
+        }
 
-        if (!dateMatch) {
-            // Pattern 2: Date followed by day name "i2 Friday", "12 Saturday", etc
+        if (!explicitDate) {
+            // Pattern 2: Date with pipe "(8 |" or "8 |"
+            const dateMatch = line.match(/^\(?\s*([0-9il]+)\)?\s*[|]/);
+            if (dateMatch) {
+                let dateStr = dateMatch[1].replace(/i/g, '1').replace(/l/g, '1');
+                const day = parseInt(dateStr);
+                if (!isNaN(day) && day >= 1 && day <= 31) {
+                    explicitDate = day;
+                }
+            }
+        }
+
+        if (!explicitDate) {
+            // Pattern 3: Date followed by day name "12 Friday"
             for (const day of days) {
                 const pattern = new RegExp(`^\\(?\\s*([0-9il]+)\\)?\\s+${day}`, 'i');
-                dateMatch = line.match(pattern);
-                if (dateMatch) break;
+                const dateMatch = line.match(pattern);
+                if (dateMatch) {
+                    let dateStr = dateMatch[1].replace(/i/g, '1').replace(/l/g, '1');
+                    explicitDate = parseInt(dateStr);
+                    break;
+                }
             }
         }
 
-        if (dateMatch) {
-            let dateStr = dateMatch[1].replace(/i/g, '1').replace(/l/g, '1');
-            const day = parseInt(dateStr);
-            if (!isNaN(day) && day >= 1 && day <= 31) {
-                explicitDate = day;
-            }
-        }
-
-        // Check if this is a data row (has pipes and might have doctor names)
+        // Check if this is a data row
         const hasPipes = line.includes('|');
-        const hasDrNames = /dr[.\s]/i.test(line) || /or[.\s]/i.test(line);
+        const hasDrNames = /dr[.\s]/i.test(line) || /tevfik/i.test(line);
         // We consider it a data row if it has a date OR (pipes AND (dr names OR day name))
-        const isDataRow = explicitDate || (hasPipes && (hasDrNames || dayNameIndex !== null));
+        // OR if it's non-piped but has date AND Tevfik
+        const isDataRow = explicitDate || (hasPipes && (hasDrNames || dayNameIndex !== null)) || (hasDrNames && lowerLine.includes('room'));
 
         if (isDataRow) {
             parsedLines.push({

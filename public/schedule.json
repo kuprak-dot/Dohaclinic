@@ -1,56 +1,16 @@
 {
-  "lastUpdated": "2025-12-28T06:49:06.059Z",
-  "sourceFile": "PHOTO-2025-12-01-12-39-34.jpg",
-  "fileLink": "https://drive.google.com/file/d/1Qz2Bfiv3y9Q1jpP_QCOa77HfCHUmFa4p/view?usp=drivesdk",
-  "fileId": "1Qz2Bfiv3y9Q1jpP_QCOa77HfCHUmFa4p",
+  "lastUpdated": "2025-12-28T11:17:32.067Z",
+  "sourceFile": "ocak liste ",
+  "fileLink": "https://docs.google.com/spreadsheets/d/1KybHGSnCzHihMdANE5b2QQIcwHq_KGwBevlHnZNOL_8/edit?usp=drivesdk",
+  "fileId": "1KybHGSnCzHihMdANE5b2QQIcwHq_KGwBevlHnZNOL_8",
   "schedule": [
-    {
-      "day": 3,
-      "dayName": "",
-      "assignments": [
-        {
-          "location": "Room 201",
-          "time": "08:00 - 15:00"
-        }
-      ]
-    },
     {
       "day": 4,
       "dayName": "",
       "assignments": [
         {
-          "location": "Room 214",
-          "time": "08:00 - 12:00"
-        }
-      ]
-    },
-    {
-      "day": 6,
-      "dayName": "",
-      "assignments": [
-        {
-          "location": "Room 201",
-          "time": "08:00 - 15:00"
-        }
-      ]
-    },
-    {
-      "day": 8,
-      "dayName": "",
-      "assignments": [
-        {
-          "location": "Room 214",
-          "time": "12:00 - 19:00"
-        }
-      ]
-    },
-    {
-      "day": 9,
-      "dayName": "",
-      "assignments": [
-        {
-          "location": "Room 214",
-          "time": "08:00 - 12:00"
+          "location": "Scheduled (Check Image)",
+          "time": "See Schedule"
         }
       ]
     },
@@ -59,8 +19,8 @@
       "dayName": "",
       "assignments": [
         {
-          "location": "Room 201",
-          "time": "08:00 - 15:00"
+          "location": "Scheduled (Check Image)",
+          "time": "See Schedule"
         }
       ]
     },
@@ -79,8 +39,18 @@
       "dayName": "",
       "assignments": [
         {
-          "location": "On Call",
-          "time": "24h"
+          "location": "Scheduled (Check Image)",
+          "time": "See Schedule"
+        }
+      ]
+    },
+    {
+      "day": 13,
+      "dayName": "",
+      "assignments": [
+        {
+          "location": "Scheduled (Check Image)",
+          "time": "See Schedule"
         }
       ]
     },
@@ -89,8 +59,8 @@
       "dayName": "",
       "assignments": [
         {
-          "location": "Room 214",
-          "time": "12:00 - 19:00"
+          "location": "Scheduled (Check Image)",
+          "time": "See Schedule"
         }
       ]
     },
@@ -99,8 +69,58 @@
       "dayName": "",
       "assignments": [
         {
-          "location": "Room 214",
-          "time": "08:00 - 12:00"
+          "location": "Scheduled (Check Image)",
+          "time": "See Schedule"
+        }
+      ]
+    },
+    {
+      "day": 17,
+      "dayName": "",
+      "assignments": [
+        {
+          "location": "Scheduled (Check Image)",
+          "time": "See Schedule"
+        }
+      ]
+    },
+    {
+      "day": 18,
+      "dayName": "",
+      "assignments": [
+        {
+          "location": "Scheduled (Check Image)",
+          "time": "See Schedule"
+        }
+      ]
+    },
+    {
+      "day": 19,
+      "dayName": "",
+      "assignments": [
+        {
+          "location": "Scheduled (Check Image)",
+          "time": "See Schedule"
+        }
+      ]
+    },
+    {
+      "day": 20,
+      "dayName": "",
+      "assignments": [
+        {
+          "location": "Scheduled (Check Image)",
+          "time": "See Schedule"
+        }
+      ]
+    },
+    {
+      "day": 21,
+      "dayName": "",
+      "assignments": [
+        {
+          "location": "Scheduled (Check Image)",
+          "time": "See Schedule"
         }
       ]
     },
@@ -109,8 +129,8 @@
       "dayName": "",
       "assignments": [
         {
-          "location": "Room 201",
-          "time": "08:00 - 15:00"
+          "location": "Scheduled (Check Image)",
+          "time": "See Schedule"
         }
       ]
     },
@@ -119,13 +139,63 @@
       "dayName": "",
       "assignments": [
         {
-          "location": "Room 201",
-          "time": "08:00 - 15:00"
+          "location": "Scheduled (Check Image)",
+          "time": "See Schedule"
         }
       ]
     },
     {
-      "day": 30,
+      "day": 25,
+      "dayName": "",
+      "assignments": [
+        {
+          "location": "Scheduled (Check Image)",
+          "time": "See Schedule"
+        }
+      ]
+    },
+    {
+      "day": 26,
+      "dayName": "",
+      "assignments": [
+        {
+          "location": "Scheduled (Check Image)",
+          "time": "See Schedule"
+        }
+      ]
+    },
+    {
+      "day": 27,
+      "dayName": "",
+      "assignments": [
+        {
+          "location": "Scheduled (Check Image)",
+          "time": "See Schedule"
+        }
+      ]
+    },
+    {
+      "day": 28,
+      "dayName": "",
+      "assignments": [
+        {
+          "location": "Scheduled (Check Image)",
+          "time": "See Schedule"
+        }
+      ]
+    },
+    {
+      "day": 29,
+      "dayName": "",
+      "assignments": [
+        {
+          "location": "Scheduled (Check Image)",
+          "time": "See Schedule"
+        }
+      ]
+    },
+    {
+      "day": 31,
       "dayName": "",
       "assignments": [
         {
@@ -134,5 +204,9 @@
         }
       ]
     }
-  ]
+  ],
+  "metadata": {
+    "month": 0,
+    "year": 2026
+  }
 }
