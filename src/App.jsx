@@ -46,17 +46,23 @@ function App() {
   const [touchStart, setTouchStart] = useState(null);
 
   useEffect(() => {
-    // Fetch schedule data
-    fetch(`/schedule.json?t=${Date.now()}`)
-      .then(res => res.json())
-      .then(data => {
-        setScheduleData(data);
+    // Check for local schedule first
+    const savedSchedule = localStorage.getItem('localSchedule');
+    if (savedSchedule) {
+      try {
+        const parsed = JSON.parse(savedSchedule);
+        setScheduleData(parsed);
+        // Also set parsedEvents so calendar export works immediately if it aligns
+        setParsedEvents(parsed.schedule);
         setLoading(false);
-      })
-      .catch(err => {
-        console.error("Error loading schedule:", err);
-        setLoading(false);
-      });
+      } catch (e) {
+        console.error("Failed to parse saved schedule", e);
+        localStorage.removeItem('localSchedule');
+        fetchDefaultSchedule();
+      }
+    } else {
+      fetchDefaultSchedule();
+    }
 
     // Fetch weather for Doha
     fetch('https://wttr.in/Doha?format=j1')
@@ -91,6 +97,19 @@ function App() {
       })
       .catch(err => console.error("Bloomberg news fetch failed:", err));
   }, []);
+
+  const fetchDefaultSchedule = () => {
+    fetch(`/schedule.json?t=${Date.now()}`)
+      .then(res => res.json())
+      .then(data => {
+        setScheduleData(data);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error("Error loading schedule:", err);
+        setLoading(false);
+      });
+  };
 
   // Auto-rotate news every 5 seconds
   useEffect(() => {
@@ -449,14 +468,51 @@ function App() {
   const getUpcomingSchedule = () => {
     const today = new Date();
     const dayOfMonth = today.getDate();
+    const currentMonth = today.getMonth();
+    const currentYear = today.getFullYear();
+
+    // Helper to determine if a day belongs to next month
+    // If today is late in month (e.g. >20) and target day is early (e.g. <15), assume next month
+    const isNextMonth = (d) => {
+      // If we are showing full month, we don't really care about "upcoming" logic as much for filtering,
+      // but we do for sorting. 
+      // For "Upcoming":
+      if (dayOfMonth > 20 && d < 15) return true;
+      return false;
+    };
+
+    // Calculate a comparable timestamp for sorting
+    const getSortableDate = (d) => {
+      let targetMonth = currentMonth;
+      let targetYear = currentYear;
+
+      if (isNextMonth(d)) {
+        targetMonth++;
+        if (targetMonth > 11) {
+          targetMonth = 0;
+          targetYear++;
+        }
+      } else if (d < dayOfMonth && !showFullMonth) {
+        // Past day, shouldn't occur in filtered list, but just in case
+        // If showing full month, past days are just current month past days
+      }
+
+      return new Date(targetYear, targetMonth, d).getTime();
+    };
 
     // Create a map of all days with assignments
     const dayMap = new Map();
 
-    // Add schedule.json data (filter hidden ones)
+    // Add schedule.json data
     if (scheduleData?.schedule) {
       scheduleData.schedule
-        .filter(d => showFullMonth || d.day > dayOfMonth)
+        .filter(d => {
+          if (showFullMonth) return true;
+          // Show if:
+          // 1. Strictly greater than today (future this month)
+          // 2. OR detected as next month
+          return d.day > dayOfMonth || isNextMonth(d.day);
+        })
         .forEach(d => {
           const filteredAssignments = d.assignments
             .filter(a => !isDutyHidden(d.day, a.location))
@@ -465,6 +521,7 @@ function App() {
           if (filteredAssignments.length > 0) {
             dayMap.set(d.day, {
               day: d.day,
+              isNextMonth: isNextMonth(d.day), // Flag for rendering
               dayName: d.dayName || '',
               assignments: filteredAssignments
             });
@@ -474,8 +531,12 @@ function App() {
 
     // Merge manual duties
     manualDuties
-      .filter(d => showFullMonth || d.day > dayOfMonth)
+      .filter(d => {
+        if (showFullMonth) return true;
+        return d.day > dayOfMonth || isNextMonth(d.day);
+      })
       .forEach(duty => {
+        const isNext = isNextMonth(duty.day);
         if (dayMap.has(duty.day)) {
           dayMap.get(duty.day).assignments.push({
             location: duty.location,
@@ -485,6 +546,7 @@ function App() {
         } else {
           dayMap.set(duty.day, {
             day: duty.day,
+            isNextMonth: isNext,
             dayName: '',
             assignments: [{
               location: duty.location,
@@ -495,10 +557,9 @@ function App() {
         }
       });
 
-    // Convert to array and sort by day
+    // Convert to array and sort by calculated date
     return Array.from(dayMap.values())
-      .sort((a, b) => a.day - b.day)
-      .slice(0, 10);
+      .sort((a, b) => getSortableDate(a.day) - getSortableDate(b.day));
   };
 
   const todayAssignments = getTodaySchedule();
@@ -552,12 +613,38 @@ function App() {
     try {
       const schedule = await parseScheduleFile(file, "Tevfik");
       setParsedEvents(schedule);
-      setProcessStatus(`Başarılı! ${schedule.length} gün bulundu.`);
+
+      const newData = {
+        lastUpdated: new Date().toISOString(),
+        sourceFile: file.name,
+        fileLink: '#',
+        fileId: 'local-upload',
+        schedule: schedule
+      };
+
+      // Update main schedule view instantly
+      setScheduleData(newData);
+
+      // SAVE TO LOCAL STORAGE
+      localStorage.setItem('localSchedule', JSON.stringify(newData));
+
+      setProcessStatus(`Başarılı! ${schedule.length} gün bulundu. Program sekmesi güncellendi ve kaydedildi.`);
     } catch (error) {
       console.error(error);
       setProcessStatus('Hata: ' + error.message);
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  const handleResetSchedule = () => {
+    if (window.confirm("Yüklü programı silip varsayılana dönmek istediğinize emin misiniz?")) {
+      localStorage.removeItem('localSchedule');
+      setParsedEvents(null);
+      setScheduleData(null); // Clear current
+      setProcessStatus('');
+      setLoading(true);
+      fetchDefaultSchedule();
     }
   };
 
@@ -818,8 +905,20 @@ function App() {
                   <>
                     {upcomingDays.map((day) => {
                       const placeholder = getNotePlaceholder(day.assignments);
-                      // Calculate day name for December 2025
-                      const date = new Date(2025, 11, day.day);
+                      // Calculate day name
+                      const today = new Date();
+                      let targetYear = today.getFullYear();
+                      let targetMonth = today.getMonth();
+
+                      if (day.isNextMonth) {
+                        targetMonth++;
+                        if (targetMonth > 11) {
+                          targetMonth = 0;
+                          targetYear++;
+                        }
+                      }
+
+                      const date = new Date(targetYear, targetMonth, day.day);
                       const dayNames = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
                       const dayName = dayNames[date.getDay()];
 
@@ -1313,9 +1412,20 @@ function App() {
             )}
 
             {scheduleData?.sourceFile && !parsedEvents && (
-              <div className="text-center mt-8 pt-8 border-t border-slate-100 w-full">
-                <p className="mb-1 text-xs uppercase font-bold text-slate-400">Şu anki aktif liste</p>
-                <p className="font-medium text-slate-600 text-sm">{scheduleData.sourceFile}</p>
+              <div className="text-center mt-8 pt-8 border-t border-slate-100 w-full space-y-4">
+                <div>
+                  <p className="mb-1 text-xs uppercase font-bold text-slate-400">Şu anki aktif liste</p>
+                  <p className="font-medium text-slate-600 text-sm">{scheduleData.sourceFile}</p>
+                </div>
+
+                {scheduleData.fileId === 'local-upload' && (
+                  <button
+                    onClick={handleResetSchedule}
+                    className="px-4 py-2 text-red-500 bg-red-50 hover:bg-red-100 rounded-lg text-sm font-medium transition-colors"
+                  >
+                    Varsayılan Listeye Dön
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -1348,7 +1458,7 @@ function App() {
                   <option value="">Gün seçin...</option>
                   {Array.from({ length: 31 }, (_, i) => {
                     const day = i + 1;
-                    const date = new Date(2025, 11, day); // December 2025
+                    const date = new Date(2026, 0, day); // January 2026
                     const dayNames = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
                     const dayName = dayNames[date.getDay()];
                     return (
