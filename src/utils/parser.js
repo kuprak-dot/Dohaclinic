@@ -184,36 +184,49 @@ export const parseScheduleText = (text, targetName) => {
             }
         }
 
-        // Flexible date detection:
-        // 1. Full date match (DD.MM.YYYY, DD/MM/YYYY, DD-MM-YYYY) anywhere in the line
-        const fullDateMatch = line.match(/(\d{1,2})[./-](\d{1,2})[./-](202\d)/);
+        // Extremely robust and permissive date detection:
+
+        // 1. Check for full dates (DD.MM.YY, DD.MM.YYYY, DD/MM/YY, etc.) anywhere in the line
+        // Supports . / - as separators and 2 or 4 digit years
+        const fullDateMatch = line.match(/(\d{1,2})[./-]\s?(\d{1,2})[./-]\s?(\d{2,4})/);
+
         if (fullDateMatch) {
             explicitDate = parseInt(fullDateMatch[1]);
-            // Also try to update detectedMonth/Year if they are missing
-            if (!detectedMonth) detectedMonth = parseInt(fullDateMatch[2]) - 1;
-            if (!detectedYear) detectedYear = parseInt(fullDateMatch[3]);
+            // Attempt to update month/year metadata if missing
+            if (!detectedMonth) {
+                const m = parseInt(fullDateMatch[2]);
+                if (m >= 1 && m <= 12) detectedMonth = m - 1;
+            }
+            if (!detectedYear) {
+                let y = parseInt(fullDateMatch[3]);
+                if (y < 100) y += 2000;
+                detectedYear = y;
+            }
         }
 
+        // 2. If no full date, check first few columns/parts for a lone number (Day of Month)
         if (!explicitDate) {
-            // 2. Pattern: Date followed by pipe (optionally preceded by pipe/semicolon)
-            // Matches "8 |", "| 8 |", ";8|", etc.
-            let dateMatch = line.match(/(?:^|[|;])\s*\(?([0-9il]{1,2})\)?\s*[|;]/);
+            const separator = line.includes('|') ? '|' : (line.includes(';') ? ';' : ',');
+            const earlyParts = line.split(separator).slice(0, 3).map(p => p.replace(/[()]/g, '').trim());
 
-            if (!dateMatch) {
-                // 3. Pattern: Date followed by day name
-                for (const day of days) {
-                    const pattern = new RegExp(`(?:^|[|;])\\s*\\(?([0-9il]{1,2})\\)?\\s+${day}`, 'i');
-                    dateMatch = line.match(pattern);
-                    if (dateMatch) break;
+            for (const p of earlyParts) {
+                // If part is just a number 1-31
+                if (/^\d{1,2}$/.test(p)) {
+                    const day = parseInt(p);
+                    if (day >= 1 && day <= 31) {
+                        explicitDate = day;
+                        break;
+                    }
                 }
-            }
-
-            if (dateMatch) {
-                let dateStr = dateMatch[1].replace(/i/g, '1').replace(/l/g, '1');
-                const day = parseInt(dateStr);
-                if (!isNaN(day) && day >= 1 && day <= 31) {
-                    explicitDate = day;
+                // Also check for "15 Friday" pattern in early parts
+                for (const dayName of days) {
+                    const m = p.match(new RegExp(`^(\\d{1,2})\\s+${dayName}`, 'i'));
+                    if (m) {
+                        explicitDate = parseInt(m[1]);
+                        break;
+                    }
                 }
+                if (explicitDate) break;
             }
         }
 
