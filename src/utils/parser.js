@@ -219,76 +219,97 @@ export const parseScheduleText = (text, targetName) => {
         }
     }
 
-    // Step 2: Assign dates logic (same as original basically)
+    // Step 2: Assign dates logic
     let lastDate = 0;
-
-    // Naive forward pass for dates
     parsedLines.forEach(row => {
         if (row.explicitDate) {
             lastDate = row.explicitDate;
             row.assignedDate = lastDate;
         } else if (lastDate > 0) {
-            // Very simple inference: if we hit a new row w/o date, is it next day?
-            // Actually, in the schedule, rows are usually days.
-            // If explicit date missing, it might be same day continuation OR next day?
-            // If it has day name, we can check.
-            row.assignedDate = lastDate + 1; // Simplify: assume sequential if missing
+            row.assignedDate = lastDate + 1;
             lastDate = row.assignedDate;
         }
     });
+
+    // Known shift patterns and their mappings
+    const shiftMappings = [
+        { keywords: ['201', 'am'], location: 'Room 201', time: '08:00 - 15:00' },
+        { keywords: ['214', 'am'], location: 'Room 214', time: '08:00 - 12:00' },
+        { keywords: ['214', 'pm', 'afternoon'], location: 'Room 214 (Afternoon)', time: '12:00 - 19:00' },
+        { keywords: ['call', 'nobet', 'nöbet'], location: 'On Call', time: '24h' },
+        { keywords: ['sidra'], location: 'Abu Sidra', time: '13:00 - 21:00' },
+        { keywords: ['3pm', '10pm', '3-10'], location: 'Evening Shift', time: '15:00 - 22:00' },
+        { keywords: ['12pm', '7pm', '12-7'], location: 'Afternoon Shift', time: '12:00 - 19:00' }
+    ];
+
+    // Helper to extract time from string if possible
+    const extractTime = (str) => {
+        const timePattern = /(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\s*[-–]\s*(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)/i;
+        const match = str.match(timePattern);
+        if (match) return `${match[1]} - ${match[2]}`;
+        return null;
+    };
 
     // Now extract shifts
     parsedLines.forEach(item => {
         if (!item.assignedDate) return;
 
-        // Split by pipe or semicolon (CSV)
         const separator = item.text.includes('|') ? '|' : (item.text.includes(';') ? ';' : ',');
         const parts = item.text.split(separator).map(p => p.trim());
 
         let assignments = [];
 
-        // Logic to find column. Original logic was specific to Column offsets.
-        // We will try a more generic approach: check ALL parts for name.
-        // If found, try to map index to location if possible, or just default to "Shift".
+        // Find headers if this line looks like a header row (contains many locations)
+        // But usually, we parse row by row.
 
         parts.forEach((part, index) => {
             if (isTargetName(part)) {
-                // Map known indices from Doha Clinic schedule format
-                // 0 or 1 is usually Room 201/214 AM
-                // 2 is Room 214 PM
-                // 3 is On Call
-                // 4 is Abu Sidra
-                // This is very fragile if format changes or image shift.
-                // Let's try to be smart with "header" detection if we had it, but we don't.
-                // We will stick to the hardcoded mapping but relax it.
+                let location = "Hospital Duty";
+                let time = "08:00 - 15:00";
 
-                let location = "Shift";
-                let time = "08:00 - 16:00";
+                // Detection logic:
+                // 1. Check current part for time hints
+                const timeInPart = extractTime(part);
+                if (timeInPart) time = timeInPart;
 
-                // Heuristic based on typical position in parts array
-                // The date/day usually takes 1 or 2 slots at start.
-                // If parts starts with date, index 0 is date.
+                // 2. Map based on column index or keyword
+                // Try to find a header or use the index-based mapping as a fallback
+                // First, check if the header row above gave us clues (not implemented here yet)
 
-                // Effective index (skipping date columns)
+                // Keyword search in the current column or surrounding context
                 let effectiveIndex = index;
-                // If the first part is a number (date), or second part is a day name, adjust index
                 if (parts[0] && (parseInt(parts[0]) || days.some(d => parts[0].toLowerCase().includes(d)))) effectiveIndex -= 1;
                 if (parts[1] && (parseInt(parts[1]) || days.some(d => parts[1].toLowerCase().includes(d)))) effectiveIndex -= 1;
-
-                // Ensure effectiveIndex isn't negative
                 effectiveIndex = Math.max(0, effectiveIndex);
 
+                // Hardcoded fallback mapping for Doha Clinic typical Excel structure
                 if (effectiveIndex === 0) { location = "Room 201"; time = "08:00 - 15:00"; }
                 else if (effectiveIndex === 1) { location = "Room 214"; time = "08:00 - 12:00"; }
                 else if (effectiveIndex === 2) { location = "Room 214 (Afternoon)"; time = "12:00 - 19:00"; }
                 else if (effectiveIndex === 3) { location = "On Call"; time = "24h"; }
                 else if (effectiveIndex === 4) { location = "Abu Sidra"; time = "13:00 - 21:00"; }
-                else {
-                    // Fallback
-                    if (part.toLowerCase().includes("call")) { location = "On Call"; time = "24h"; }
-                    else if (part.toLowerCase().includes("sidra")) { location = "Abu Sidra"; time = "13:00 - 21:00"; }
-                    else { location = "Hospital Duty"; }
+
+                // Override with better detection if possible
+                // Look at the "part" itself for clues, or the header (if we could find it)
+                // For now, let's use the part text to refine
+                const lowerPart = part.toLowerCase();
+                if (lowerPart.includes('201')) location = "Room 201";
+                if (lowerPart.includes('214')) {
+                    if (lowerPart.includes('pm') || lowerPart.includes('afternoon')) location = "Room 214 (Afternoon)";
+                    else location = "Room 214";
                 }
+                if (lowerPart.includes('call') || lowerPart.includes('nobet') || lowerPart.includes('nöbet')) {
+                    location = "On Call";
+                    time = "24h";
+                }
+                if (lowerPart.includes('sidra')) {
+                    location = "Abu Sidra";
+                    time = "13:00 - 21:00";
+                }
+
+                // If part contains a specific time range like 3pm-10pm, use it
+                const foundTime = extractTime(lowerPart);
+                if (foundTime) time = foundTime;
 
                 assignments.push({ location, time });
             }

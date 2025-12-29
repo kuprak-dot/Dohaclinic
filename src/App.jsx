@@ -37,6 +37,7 @@ function App() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [processStatus, setProcessStatus] = useState('');
   const [parsedEvents, setParsedEvents] = useState(null);
+  const [parsedMetadata, setParsedMetadata] = useState(null);
 
   // News Widget State
   const [news, setNews] = useState([]);
@@ -631,43 +632,75 @@ function App() {
     setIsProcessing(true);
     setProcessStatus('Analiz ediliyor (Bu işlem birkaç saniye sürebilir)...');
     setParsedEvents(null);
+    setParsedMetadata(null);
 
     try {
       const result = await parseScheduleFile(file, "Tevfik");
-      // Result is now { schedule, metadata }
-      const schedule = result.schedule || result; // Handle legacy array if parser fails update
+      const schedule = result.schedule || result;
       const metadata = result.metadata || {};
 
       setParsedEvents(schedule);
-
-      const newData = {
-        lastUpdated: new Date().toISOString(),
-        sourceFile: file.name,
-        fileLink: '#',
-        fileId: 'local-upload',
-        schedule: schedule,
-        metadata: metadata // Save metadata
-      };
-
-      // Update main schedule view instantly
-      setScheduleData(newData);
-
-      // SAVE TO LOCAL STORAGE
-      localStorage.setItem('localSchedule', JSON.stringify(newData));
+      setParsedMetadata(metadata);
 
       let msg = `Başarılı! ${schedule.length} gün bulundu.`;
       if (metadata.month !== null) {
-        // Convert month index to name for display
         const mName = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'][metadata.month];
         msg += ` (${mName} ${metadata.year || ''} tespit edildi)`;
       }
-      setProcessStatus(msg + ' Program sekmesi güncellendi ve kaydedildi.');
+      setProcessStatus(msg + ' Lütfen aşağıdan kontrol edip düzenleyin.');
     } catch (error) {
       console.error(error);
       setProcessStatus('Hata: ' + error.message);
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  const updateParsedEvent = (dayIndex, assignmentIndex, field, value) => {
+    setParsedEvents(prev => {
+      const newEvents = [...prev];
+      const day = { ...newEvents[dayIndex] };
+      const assignments = [...day.assignments];
+      assignments[assignmentIndex] = { ...assignments[assignmentIndex], [field]: value };
+      day.assignments = assignments;
+      newEvents[dayIndex] = day;
+      return newEvents;
+    });
+  };
+
+  const removeParsedEvent = (dayIndex, assignmentIndex) => {
+    setParsedEvents(prev => {
+      const newEvents = [...prev];
+      const day = { ...newEvents[dayIndex] };
+      day.assignments = day.assignments.filter((_, i) => i !== assignmentIndex);
+      if (day.assignments.length === 0) {
+        return newEvents.filter((_, i) => i !== dayIndex);
+      }
+      newEvents[dayIndex] = day;
+      return newEvents;
+    });
+  };
+
+  const handleAddToMainProgram = () => {
+    if (!parsedEvents || parsedEvents.length === 0) return;
+
+    const newData = {
+      lastUpdated: new Date().toISOString(),
+      sourceFile: 'Kullanıcı Tarafından Düzenlendi',
+      fileLink: '#',
+      fileId: 'local-upload',
+      schedule: parsedEvents,
+      metadata: parsedMetadata
+    };
+
+    setScheduleData(newData);
+    localStorage.setItem('localSchedule', JSON.stringify(newData));
+    setParsedEvents(null);
+    setParsedMetadata(null);
+    setProcessStatus('Program başarıyla ana ekrana eklendi! Program sekmesinden görebilirsiniz.');
+
+    // Optionally switch to schedule tab
+    // setActiveTab('schedule'); 
   };
 
   const handleResetSchedule = () => {
@@ -1156,10 +1189,7 @@ function App() {
         )}
 
         {activeTab === 'files' && (
-          <div className="flex flex-col items-center justify-start min-h-[60vh] text-slate-400 p-4 space-y-6">
-
-
-
+          <div className="flex flex-col items-center justify-start min-h-[60vh] p-4 space-y-6">
             <div className="w-full max-w-sm bg-white p-6 rounded-2xl shadow-sm border border-slate-100 text-center">
               <FileText size={48} className="mx-auto mb-4 text-slate-300" />
               <h3 className="text-lg font-bold text-slate-800 mb-2">Program Yükle</h3>
@@ -1184,7 +1214,7 @@ function App() {
               </label>
             </div>
 
-            {/* Status & Results */}
+            {/* Status */}
             {(isProcessing || processStatus) && (
               <div className="w-full max-w-sm bg-white p-4 rounded-xl shadow-sm border border-slate-100 text-center">
                 {isProcessing ? (
@@ -1194,36 +1224,99 @@ function App() {
                   </div>
                 ) : (
                   <div className="py-2">
-                    <p className={`font-bold mb-3 ${processStatus.includes('Hata') ? 'text-red-500' : 'text-green-600'}`}>
+                    <p className={`font-bold ${processStatus.includes('Hata') ? 'text-red-500' : 'text-green-600'}`}>
                       {processStatus}
                     </p>
-
-
                   </div>
                 )}
               </div>
             )}
 
-            {/* Preview of Events */}
+            {/* Preview of Events (Editable) */}
             {parsedEvents && parsedEvents.length > 0 && (
-              <div className="w-full max-w-sm space-y-2">
-                <h4 className="font-bold text-slate-700 px-1">Bulunan Vardiyalar ({parsedEvents.length})</h4>
-                {parsedEvents.map((day, idx) => (
-                  <div key={idx} className="bg-white p-3 rounded-xl border border-slate-100 flex items-start gap-3">
-                    <div className="bg-slate-100 px-2 py-1 rounded text-center min-w-[3rem]">
-                      <span className="block text-xl font-bold text-slate-700">{day.day}</span>
-                    </div>
-                    <div className="flex-1 space-y-1">
-                      {day.assignments.map((a, i) => (
-                        <div key={i} className="text-sm">
-                          <span className="font-bold text-slate-800">{a.location}</span>
-                          <span className="text-slate-400 mx-1">•</span>
-                          <span className="text-slate-500">{a.time}</span>
+              <div className="w-full max-w-sm space-y-4">
+                <div className="flex items-center justify-between px-1">
+                  <h4 className="font-bold text-slate-700">Bulunan Vardiyalar ({parsedEvents.reduce((acc, curr) => acc + curr.assignments.length, 0)})</h4>
+                  <button
+                    onClick={() => { setParsedEvents(null); setProcessStatus(''); }}
+                    className="text-xs text-slate-400 hover:text-red-500 font-medium"
+                  >
+                    Temizle
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  {parsedEvents.map((day, dIdx) => (
+                    <div key={dIdx} className="bg-white p-3 rounded-xl border border-slate-100 space-y-2">
+                      <div className="flex items-center gap-3 border-b border-slate-50 pb-2">
+                        <div className="bg-slate-100 px-2 py-0.5 rounded text-center min-w-[2.5rem]">
+                          <span className="text-lg font-bold text-slate-700">{day.day}</span>
                         </div>
-                      ))}
+                        <span className="text-xs font-bold text-slate-400 uppercase">GÜN</span>
+                      </div>
+
+                      <div className="space-y-3">
+                        {day.assignments.map((a, aIdx) => (
+                          <div key={aIdx} className="relative group bg-slate-50 p-2 rounded-lg border border-slate-100">
+                            <button
+                              onClick={() => removeParsedEvent(dIdx, aIdx)}
+                              className="absolute -top-2 -right-2 w-5 h-5 bg-red-100 text-red-500 rounded-full flex items-center justify-center shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <X size={12} />
+                            </button>
+
+                            <div className="grid grid-cols-1 gap-2">
+                              <input
+                                type="text"
+                                value={a.location}
+                                onChange={(e) => updateParsedEvent(dIdx, aIdx, 'location', e.target.value)}
+                                className="bg-transparent border-none p-0 font-bold text-slate-800 focus:ring-0 text-sm"
+                                placeholder="Konum..."
+                              />
+                              <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                                <Clock size={12} />
+                                <input
+                                  type="text"
+                                  value={a.time}
+                                  onChange={(e) => updateParsedEvent(dIdx, aIdx, 'time', e.target.value)}
+                                  className="bg-transparent border-none p-0 focus:ring-0 w-full"
+                                  placeholder="Saat..."
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
+
+                {/* New Buttons */}
+                <div className="pt-4 space-y-3">
+                  <button
+                    onClick={() => {
+                      const icsContent = generateICS(parsedEvents.map(day => ({
+                        ...day,
+                        month: parsedMetadata?.month,
+                        year: parsedMetadata?.year
+                      })));
+                      const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+                      saveAs(blob, `yeni_program.ics`);
+                    }}
+                    className="w-full py-3 bg-slate-800 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-700 transition-colors shadow-sm"
+                  >
+                    <Download size={20} />
+                    iPhone Takvimine Ekle
+                  </button>
+
+                  <button
+                    onClick={handleAddToMainProgram}
+                    className="w-full py-3 bg-primary text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-sky-600 transition-colors shadow-lg"
+                  >
+                    <Plus size={20} />
+                    Ana Programa Ekle
+                  </button>
+                </div>
               </div>
             )}
 
@@ -1248,14 +1341,10 @@ function App() {
             <div className="pt-8 mt-8 border-t border-slate-100 w-full">
               <button
                 onClick={handleFactoryReset}
-                className="flex items-center justify-center space-x-2 w-full px-4 py-3 text-red-600 border border-red-200 bg-red-50 hover:bg-red-100 rounded-xl text-sm font-bold transition-colors"
+                className="flex items-center justify-center space-x-2 w-full px-4 py-3 text-slate-400 border border-slate-200 hover:bg-red-50 hover:text-red-500 hover:border-red-100 rounded-xl text-xs font-medium transition-colors"
               >
-                <span>⚠️</span>
-                <span>Uygulamayı Tamamen Sıfırla (Önbellek Temizle)</span>
+                <span>Uygulamayı Tamamen Sıfırla</span>
               </button>
-              <p className="mt-2 text-xs text-slate-400 px-4 text-center">
-                Eğer notlarınız veya listeniz karıştıysa bu butonu kullanarak tüm verileri silebilirsiniz.
-              </p>
             </div>
           </div>
         )}
