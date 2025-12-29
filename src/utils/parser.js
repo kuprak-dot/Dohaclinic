@@ -184,23 +184,33 @@ export const parseScheduleText = (text, targetName) => {
             }
         }
 
-        // Regex for date: look for number at start or before pipe
-        // Matches "8 |", "(8 |", "08|", etc.
-        let dateMatch = line.match(/^\(?\s*([0-9il]+)\)?\s*[|]/);
-
-        if (!dateMatch) {
-            for (const day of days) {
-                const pattern = new RegExp(`^\\(?\\s*([0-9il]+)\\)?\\s+${day}`, 'i');
-                dateMatch = line.match(pattern);
-                if (dateMatch) break;
-            }
+        // Flexible date detection:
+        // 1. Full date match (DD.MM.YYYY) anywhere in the start of the line
+        const fullDateMatch = line.match(/(?:^|[|;])\s*(\d{1,2})[./](\d{1,2})[./](202\d)\s*(?:[|;]|$)/);
+        if (fullDateMatch) {
+            explicitDate = parseInt(fullDateMatch[1]);
         }
 
-        if (dateMatch) {
-            let dateStr = dateMatch[1].replace(/i/g, '1').replace(/l/g, '1');
-            const day = parseInt(dateStr);
-            if (!isNaN(day) && day >= 1 && day <= 31) {
-                explicitDate = day;
+        if (!explicitDate) {
+            // 2. Pattern: Date followed by pipe (optionally preceded by pipe/semicolon)
+            // Matches "8 |", "| 8 |", ";8|", etc.
+            let dateMatch = line.match(/(?:^|[|;])\s*\(?([0-9il]{1,2})\)?\s*[|;]/);
+
+            if (!dateMatch) {
+                // 3. Pattern: Date followed by day name
+                for (const day of days) {
+                    const pattern = new RegExp(`(?:^|[|;])\\s*\\(?([0-9il]{1,2})\\)?\\s+${day}`, 'i');
+                    dateMatch = line.match(pattern);
+                    if (dateMatch) break;
+                }
+            }
+
+            if (dateMatch) {
+                let dateStr = dateMatch[1].replace(/i/g, '1').replace(/l/g, '1');
+                const day = parseInt(dateStr);
+                if (!isNaN(day) && day >= 1 && day <= 31) {
+                    explicitDate = day;
+                }
             }
         }
 
