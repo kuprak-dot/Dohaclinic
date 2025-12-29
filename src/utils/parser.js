@@ -286,13 +286,15 @@ export const parseScheduleText = (text, targetName) => {
                 if (timeInPart) time = timeInPart;
 
                 // 2. Map based on column index or keyword
-                // Try to find a header or use the index-based mapping as a fallback
-                // First, check if the header row above gave us clues (not implemented here yet)
-
-                // Keyword search in the current column or surrounding context
+                // Heuristic for column offset: skip columns that look like dates or day names
                 let effectiveIndex = index;
-                if (parts[0] && (parseInt(parts[0]) || days.some(d => parts[0].toLowerCase().includes(d)))) effectiveIndex -= 1;
-                if (parts[1] && (parseInt(parts[1]) || days.some(d => parts[1].toLowerCase().includes(d)))) effectiveIndex -= 1;
+                for (let k = 0; k < index; k++) {
+                    const p = parts[k].toLowerCase();
+                    // If it's a day name, a clear date (1-31), or a full date format, skip it from index
+                    if (days.some(d => p.includes(d)) || /^\d{1,2}$/.test(p) || /\d{1,2}[./-]\d{1,2}[./-]\d{2,4}/.test(p)) {
+                        effectiveIndex -= 1;
+                    }
+                }
                 effectiveIndex = Math.max(0, effectiveIndex);
 
                 // Hardcoded fallback mapping for Doha Clinic typical Excel structure
