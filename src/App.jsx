@@ -715,8 +715,11 @@ function App() {
   };
 
   const handleFactoryReset = () => {
-    if (window.confirm('DİKKAT: Tüm kişisel verileriniz (notlar, eklenen görevler, antrenman geçmişi ve yüklenen listeler) SİLİNECEK. Uygulama ilk haline dönecek. Emin misiniz?')) {
-      localStorage.clear();
+    if (window.confirm('DİKKAT: Notlar, eklenen görevler ve yüklenen listeler silinecek. Antrenman verileriniz KORUNACAK. Emin misiniz?')) {
+      localStorage.removeItem('localSchedule');
+      localStorage.removeItem('dailyNotes');
+      localStorage.removeItem('manualDuties');
+      localStorage.removeItem('hiddenDuties');
       window.location.reload();
     }
   };
