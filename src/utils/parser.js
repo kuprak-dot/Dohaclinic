@@ -185,10 +185,13 @@ export const parseScheduleText = (text, targetName) => {
         }
 
         // Flexible date detection:
-        // 1. Full date match (DD.MM.YYYY) anywhere in the start of the line
-        const fullDateMatch = line.match(/(?:^|[|;])\s*(\d{1,2})[./](\d{1,2})[./](202\d)\s*(?:[|;]|$)/);
+        // 1. Full date match (DD.MM.YYYY, DD/MM/YYYY, DD-MM-YYYY) anywhere in the line
+        const fullDateMatch = line.match(/(\d{1,2})[./-](\d{1,2})[./-](202\d)/);
         if (fullDateMatch) {
             explicitDate = parseInt(fullDateMatch[1]);
+            // Also try to update detectedMonth/Year if they are missing
+            if (!detectedMonth) detectedMonth = parseInt(fullDateMatch[2]) - 1;
+            if (!detectedYear) detectedYear = parseInt(fullDateMatch[3]);
         }
 
         if (!explicitDate) {
@@ -214,11 +217,11 @@ export const parseScheduleText = (text, targetName) => {
             }
         }
 
-        const hasPipes = line.includes('|') || line.includes(';'); // CSV might use ;
-        // We consider it a data row if it has a date OR (pipes AND check for name/day)
+        const hasPipes = line.includes('|') || line.includes(';');
         const isDataRow = explicitDate || (hasPipes);
 
         if (isDataRow) {
+            // console.log(`Row ${i}: date=${explicitDate}, text="${line}"`); // Debug
             parsedLines.push({
                 text: line,
                 explicitDate,
